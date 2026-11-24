@@ -266,6 +266,27 @@ const initials = s => (s || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).ma
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
+const APP_URL = (window.RENO_CONFIG && window.RENO_CONFIG.appUrl) || 'https://ncrddata-rgb.github.io/renovation-tracker/';
+function inviteText(email) {
+  return `Hi, please use our house renovation tracker: ${APP_URL}\n1. Open the link.\n2. Tap Sign in with Google.\n3. Choose ${email ? 'this Gmail address: ' + email : 'the Gmail address I added for you'}.`;
+}
+async function shareInvite(email) {
+  if (!can.members()) return;
+  const text = inviteText(email);
+  if (navigator.share) {
+    try { await navigator.share({ title: 'House renovation tracker', text }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(text); toast('Invite copied. Paste it into WhatsApp or email.'); }
+  catch { shareFallback(text); }
+}
+function shareFallback(text) {
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form method="dialog"><div class="dlg-head"><h2>Share the app</h2><button class="btn" type="button" data-close>← Back</button></div>
+    <p class="small muted">Copy this message and send it on WhatsApp or email.</p>
+    <textarea class="field" rows="6" style="width:100%" readonly>${esc(text)}</textarea></form>`;
+  dlg.showModal(); const ta = dlg.querySelector('textarea'); ta.focus(); ta.select();
+}
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2600); }
 function isLate(it) { return it.status !== 'done' && it.plannedEnd && it.plannedEnd < todayISO(); }
 function statusPill(it) { const s = ST[it.status] || ST.planned; return `<span class="pill ${s.cls}">${s.label}</span>`; }
@@ -478,11 +499,13 @@ function render() {
       <nav class="tabs" aria-label="Sections">${VIEWS.map(x => `<a href="#${x.id}" ${x.id === v ? 'aria-current="page"' : ''}>${x.label}</a>`).join('')}</nav>
       <div class="who"><div class="avatar" title="${esc(u.email)}">${u.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">` : initials(u.name)}</div>
         <span class="name small">${esc(u.name)}<br><span class="muted">${esc((ROLES.find(r => r.id === role()) || {}).label)}</span></span>
+        ${can.members() ? '<button class="btn sm" id="shareApp" title="Share the app link with your team">Share</button>' : ''}
         ${store.mode === 'live' ? '<button class="btn sm ghost" id="signout">Sign out</button>' : ''}</div>
     </div></header>
     ${demoBanner}
     <main class="wrap" id="main"></main>`;
   $('#signout')?.addEventListener('click', () => store.signOut());
+  $('#shareApp')?.addEventListener('click', () => shareInvite());
   const main = $('#main');
   ({ dashboard: viewDashboard, items: viewItems, board: viewBoard, timeline: viewTimeline, aspects: viewAspects, team: viewTeam })[v](main);
 }
@@ -741,7 +764,7 @@ function viewTeam(main) {
     ${can.members() ? '<button class="btn primary" id="addMember">+ Add person</button>' : ''}</div>
     <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Trade</th><th>Phone</th><th>Open items</th><th></th></tr></thead><tbody>
     ${ms.map(m => { const open = state.items.filter(i => i.contact === m.email && i.status !== 'done').length; return `<tr class="${m.disabled ? 'is-off' : ''}"><td><b>${esc(m.name || m.email)}</b>${m.disabled ? ' <span class="pill s-late">Disabled</span>' : ''}<div class="small muted">${esc(m.email)}</div></td><td>${esc((ROLES.find(r => r.id === m.role) || {}).label || m.role)}</td><td>${esc(m.trade || '')}</td><td class="num">${m.phone ? `<a href="tel:${esc(m.phone.replace(/[^\d+]/g, ''))}">${esc(m.phone)}</a>` : ''}</td>
-      <td class="num">${open ? `<button class="btn sm ghost" data-contact="${esc(m.email)}">${open}</button>` : '0'}</td><td style="white-space:nowrap">${can.members() ? `<button class="btn sm" data-edit-member="${esc(m.email)}">Edit</button> <span class="seg" role="group" aria-label="Access for ${esc(m.name || m.email)}"><button class="btn sm" data-access="on" data-email="${esc(m.email)}" aria-pressed="${!m.disabled}">Enable</button><button class="btn sm" data-access="off" data-email="${esc(m.email)}" aria-pressed="${!!m.disabled}">Disable</button></span> <button class="btn sm danger" data-remove="${esc(m.email)}">Remove</button>` : ''}</td></tr>`; }).join('')}
+      <td class="num">${open ? `<button class="btn sm ghost" data-contact="${esc(m.email)}">${open}</button>` : '0'}</td><td style="white-space:nowrap">${can.members() ? `<button class="btn sm" data-edit-member="${esc(m.email)}">Edit</button> <span class="seg" role="group" aria-label="Access for ${esc(m.name || m.email)}"><button class="btn sm" data-access="on" data-email="${esc(m.email)}" aria-pressed="${!m.disabled}">Enable</button><button class="btn sm" data-access="off" data-email="${esc(m.email)}" aria-pressed="${!!m.disabled}">Disable</button></span> <button class="btn sm" data-invite="${esc(m.email)}" title="Send this person the app link">Invite</button> <button class="btn sm danger" data-remove="${esc(m.email)}">Remove</button>` : ''}</td></tr>`; }).join('')}
     </tbody></table></div>
     ${can.members() ? `<section class="panel" style="margin-top:32px;max-width:560px"><h2>Project settings</h2><form id="sf" class="form">
       <label class="full">Project name<input class="field" id="s_name" value="${esc(projectName())}"></label>
@@ -768,6 +791,7 @@ function viewTeam(main) {
     catch (err) { console.error(err); toast('Could not change access. Only owners can do this.'); }
   });
   main.querySelectorAll('[data-contact]').forEach(b => b.onclick = () => setFilters({ contact: b.dataset.contact }));
+  main.querySelectorAll('[data-invite]').forEach(b => b.onclick = () => shareInvite(b.dataset.invite));
   const sf = $('#sf', main);
   if (sf) sf.onsubmit = async e => { e.preventDefault(); try { await store.saveSettings({ projectName: $('#s_name').value.trim(), deadline: $('#s_deadline').value || '2026-12-25', budget: Number($('#s_budget').value) || 0 }); toast('Settings saved'); } catch { toast('Could not save settings'); } };
 }
