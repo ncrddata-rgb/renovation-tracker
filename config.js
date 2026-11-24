@@ -1,16 +1,15 @@
 // House Renovation Tracker settings.
-//
-// Leave apiKey empty to run in DEMO mode (data stays in this browser only).
-// To go live, paste the values Firebase shows you under
-// Project settings > General > Your apps > SDK setup and configuration > Config.
+// Firebase project: our-house-renovation-app (these web keys are public by design;
+// the Firestore access rules are what protect the data).
+// To run as a local demo instead, empty the apiKey value.
 window.RENO_CONFIG = {
   firebase: {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+    apiKey: "AIzaSyBEbFuAReBblXLWkQdewOf94gEEVBvzuXs",
+    authDomain: "our-house-renovation-app.firebaseapp.com",
+    projectId: "our-house-renovation-app",
+    storageBucket: "our-house-renovation-app.firebasestorage.app",
+    messagingSenderId: "967546857112",
+    appId: "1:967546857112:web:826add42b4ac92d5ee52ed"
   },
   projectName: "Our House Renovation",
   deadline: "2026-12-25"
