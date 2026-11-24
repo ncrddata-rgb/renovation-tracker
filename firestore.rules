@@ -1,0 +1,53 @@
+rules_version = '2';
+// House Renovation Tracker: who can read and change what.
+// STEP: replace OWNER_GMAIL@gmail.com below with the Gmail address of the first owner
+// (all small letters). That person can then sign in and add everyone else in the app.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function email() { return request.auth.token.email.lower(); }
+    function isFirstOwner() { return signedIn() && email() in ['OWNER_GMAIL@gmail.com']; }
+    function memberDoc() { return /databases/$(database)/documents/members/$(email()); }
+    function isMember() { return isFirstOwner() || (signedIn() && exists(memberDoc()) && get(memberDoc()).data.get('disabled', false) != true); }
+    function role() { return isFirstOwner() ? 'owner' : get(memberDoc()).data.role; }
+    function isOwner() { return isMember() && role() == 'owner'; }
+    function isManager() { return isMember() && role() in ['owner', 'manager', 'engineer']; }
+    function isContractor() { return isMember() && role() == 'contractor'; }
+    function contractorFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['status', 'progress', 'nextSteps', 'actualDate', 'updatedBy', 'updatedAt']);
+    }
+
+    match /members/{memberId} {
+      allow read: if isMember();
+      allow write: if isOwner();
+    }
+    match /settings/{id} {
+      allow read: if isMember();
+      allow write: if isOwner();
+    }
+    match /aspects/{id} {
+      allow read: if isMember();
+      allow create, update: if isManager();
+      allow delete: if isOwner();
+    }
+    match /items/{id} {
+      allow read: if isMember();
+      allow create: if isManager();
+      allow update: if isManager() || (isContractor() && contractorFieldsOnly());
+      allow delete: if isManager();
+    }
+    match /comments/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.by == email();
+      allow delete: if isOwner();
+    }
+    match /photos/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.by == email()
+                    && request.resource.data.data.size() < 900000;
+      allow delete: if isManager() || (isMember() && resource.data.by == email());
+    }
+  }
+}

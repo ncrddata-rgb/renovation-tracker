@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>House Renovation Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a site register. Sticky top bar with tabs, single content column up to 1180px, cards only for tiles and dialogs. */
+:root {
+  --bg: #f5f6f4;
+  --surface: #ffffff;
+  --sunken: #eceeea;
+  --line: #d9ddd6;
+  --fg: #1d2420;
+  --muted: #5f6a63;
+  --accent: #1f5c7a;
+  --accent-soft: #dbe8ef;
+  --planned: #6b7280;
+  --planned-soft: #eceef1;
+  --progress: #1d6fb8;
+  --progress-soft: #dcebf8;
+  --hold: #a86208;
+  --hold-soft: #fbeed9;
+  --done: #2f7d3b;
+  --done-soft: #def0e0;
+  --late: #b42318;
+  --late-soft: #fbe3e0;
+  --shadow: 0 1px 2px rgba(20,30,25,.06), 0 8px 24px rgba(20,30,25,.06);
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131715; --surface: #1b201d; --sunken: #232925; --line: #333b36; --fg: #e6ebe7; --muted: #9aa59e;
+    --accent: #7cb6d4; --accent-soft: #1d3441;
+    --planned: #a3aab4; --planned-soft: #2a2e33; --progress: #6fb0ea; --progress-soft: #17314a;
+    --hold: #e3a24a; --hold-soft: #3a2a12; --done: #74c483; --done-soft: #183320; --late: #f07a6c; --late-soft: #3d1a16;
+    --shadow: 0 1px 2px rgba(0,0,0,.3); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131715; --surface: #1b201d; --sunken: #232925; --line: #333b36; --fg: #e6ebe7; --muted: #9aa59e;
+  --accent: #7cb6d4; --accent-soft: #1d3441;
+  --planned: #a3aab4; --planned-soft: #2a2e33; --progress: #6fb0ea; --progress-soft: #17314a;
+  --hold: #e3a24a; --hold-soft: #3a2a12; --done: #74c483; --done-soft: #183320; --late: #f07a6c; --late-soft: #3d1a16;
+  --shadow: 0 1px 2px rgba(0,0,0,.3); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -.01em; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.topbar .wrap { display: flex; align-items: center; gap: 16px; min-height: 56px; flex-wrap: wrap; }
+.brand { display: flex; flex-direction: column; line-height: 1.15; margin-right: auto; min-width: 0; }
+.brand b { font-family: var(--font-display); font-size: 17px; }
+.brand span { font-size: 12px; color: var(--muted); }
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.tabs a { padding: 8px 12px; border-radius: 8px; color: var(--muted); text-decoration: none; font-weight: 500; white-space: nowrap; }
+.tabs a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.who { display: flex; align-items: center; gap: 8px; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 600; font-size: 12px; overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 760px) {
+  .tabs { order: 3; width: 100%; padding-bottom: 8px; }
+  .who .name { display: none; }
+}
+.banner { background: var(--hold-soft); color: var(--fg); border-bottom: 1px solid var(--line); font-size: 13px; }
+.banner .wrap { padding-block: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+main { padding-block: 24px 64px; }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.section-head h1 { font-size: 26px; }
+.section-head p { margin: 4px 0 0; color: var(--muted); }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); padding: 7px 12px; border-radius: 8px; font-weight: 500; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn.danger { color: var(--late); }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.sm { padding: 4px 9px; font-size: 12.5px; }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* status pills */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.s-planned { color: var(--planned); background: var(--planned-soft); }
+.s-progress { color: var(--progress); background: var(--progress-soft); }
+.s-hold { color: var(--hold); background: var(--hold-soft); }
+.s-done { color: var(--done); background: var(--done-soft); }
+.s-late { color: var(--late); background: var(--late-soft); }
+select.status-select { border: 0; border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 600; appearance: none; -webkit-appearance: none; text-align: center; }
+
+.bar { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+
+/* dashboard */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; text-align: left; }
+button.kpi:hover { border-color: var(--muted); }
+.kpi .label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.kpi .value { font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1.2; margin-top: 4px; }
+.kpi .sub { font-size: 12.5px; color: var(--muted); }
+.kpi.countdown { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.kpi.countdown .label, .kpi.countdown .sub { color: inherit; opacity: .85; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+.grid2 > * { min-width: 0; }
+.panel h2 { font-size: 17px; margin-bottom: 10px; }
+.list { border-top: 1px solid var(--line); }
+.list-row { display: flex; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.list-row:hover { background: var(--sunken); }
+.list-row .t { flex: 1; min-width: 0; }
+.list-row .t b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { padding: 16px 2px; color: var(--muted); }
+.aspect-prog { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr auto; gap: 10px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.aspect-prog:hover { background: var(--sunken); }
+.stack { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--sunken); }
+.stack i { display: block; height: 100%; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.money { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.money div b { display: block; font-family: var(--font-display); font-size: 20px; }
+
+/* filters + items */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+.filters input[type=search] { flex: 1 1 220px; min-width: 0; }
+.field, .filters input, .filters select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 10px; }
+.filters select { max-width: 100%; }
+.chk { display: inline-flex; gap: 6px; align-items: center; }
+.group { margin-bottom: 20px; }
+.group-head { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--fg); }
+.group-head h2 { font-size: 16px; }
+.group-head .bar { flex: 0 0 90px; }
+.item-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 150px 130px 90px; gap: 12px; align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.item-row:hover { background: var(--sunken); }
+.item-row .title { cursor: pointer; min-width: 0; }
+.item-row .title b { font-weight: 500; }
+.item-row .meta { font-size: 12px; color: var(--muted); }
+tr.is-off td { color: var(--muted); }
+.seg { display: inline-flex; }
+.seg .btn { border-radius: 0; }
+.seg .btn:first-child { border-radius: 8px 0 0 8px; }
+.seg .btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.seg .btn[aria-pressed="true"][data-access="on"] { background: var(--done-soft); color: var(--done); border-color: var(--done); font-weight: 600; }
+.seg .btn[aria-pressed="true"][data-access="off"] { background: var(--late-soft); color: var(--late); border-color: var(--late); font-weight: 600; position: relative; }
+.tag { display: inline-block; font-size: 11px; padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); margin-right: 4px; }
+@media (max-width: 760px) {
+  .item-row { grid-template-columns: 110px minmax(0, 1fr); }
+  .item-row .c-contact, .item-row .c-dates, .item-row .c-prog { grid-column: 2; }
+  .item-row .c-contact, .item-row .c-dates { font-size: 12px; }
+}
+
+/* board */
+.board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.col { background: var(--sunken); border-radius: 12px; padding: 10px; min-height: 200px; }
+.col.drop { outline: 2px dashed var(--accent); }
+.col h2 { font-size: 14px; display: flex; justify-content: space-between; margin: 2px 4px 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 8px; cursor: grab; }
+.card b { font-weight: 500; display: block; }
+.card .meta { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+
+/* timeline */
+.tl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.tl { position: relative; min-width: 760px; }
+.tl-row { display: grid; grid-template-columns: 240px 1fr; border-bottom: 1px solid var(--line); min-height: 30px; align-items: center; }
+.tl-row.head { position: sticky; top: 0; background: var(--surface); z-index: 2; font-size: 11.5px; color: var(--muted); }
+.tl-row.grp { background: var(--sunken); font-weight: 600; font-family: var(--font-display); }
+.tl-name { padding: 4px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.tl-track { position: relative; height: 30px; }
+.tl-bar { position: absolute; top: 8px; height: 14px; border-radius: 7px; cursor: pointer; }
+.tl-line { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--late); z-index: 1; pointer-events: none; }
+.tl-line.today { border-left: 2px solid var(--accent); }
+.tl-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.tl-tick span { position: absolute; top: 6px; left: 4px; white-space: nowrap; }
+
+/* tables (aspects, team) */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+
+/* dialog */
+dialog { border: 0; border-radius: 14px; padding: 0; width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(10,15,12,.45); }
+.dlg-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 20px 10px; position: sticky; top: 0; background: var(--surface); z-index: 1; border-bottom: 1px solid var(--line); }
+.dlg-head h2 { font-size: 20px; }
+.dlg-body { padding: 16px 20px 20px; display: grid; gap: 18px; }
+.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.form label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.form label.full { grid-column: 1 / -1; }
+.form .field { width: 100%; color: var(--fg); font-size: 14px; }
+.form textarea.field { min-height: 70px; resize: vertical; }
+@media (max-width: 560px) { .form { grid-template-columns: 1fr; } }
+.photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.photo { position: relative; aspect-ratio: 1; max-width: 100%; border-radius: 8px; overflow: hidden; background: var(--sunken); }
+.photo img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+.photo button { position: absolute; top: 4px; right: 4px; padding: 0 6px; border-radius: 6px; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; }
+.upload { display: grid; place-items: center; aspect-ratio: 1; border: 1.5px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: 12.5px; text-align: center; cursor: pointer; padding: 6px; }
+.upload input { display: none; }
+.sub-h { font-size: 13px; font-weight: 600; font-family: var(--font-display); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.feed { display: grid; gap: 10px; }
+.feed .c { display: grid; grid-template-columns: 28px 1fr; gap: 8px; font-size: 13.5px; }
+.feed .c.change { color: var(--muted); font-size: 12.5px; }
+.feed .c .avatar { width: 26px; height: 26px; font-size: 11px; }
+.comment-box { display: flex; gap: 8px; }
+.comment-box input { flex: 1; min-width: 0; }
+
+/* sign-in */
+.gate { min-height: 80vh; display: grid; place-items: center; padding: 24px 16px; }
+.gate .box { max-width: 420px; text-align: center; display: grid; gap: 14px; justify-items: center; }
+.gate h1 { font-size: 28px; }
+.gbtn { display: inline-flex; gap: 10px; align-items: center; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: 13px; z-index: 50; }
+@media (prefers-reduced-motion: no-preference) { .bar > i { transition: width .3s; } }
+</style>
+
+<div id="app"><div class="gate"><div class="box"><h1>House Renovation Tracker</h1><p class="muted">Loading…</p></div></div></div>
+<dialog id="dlg"></dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script src="config.js"></script>
+<script src="seed.js"></script>
+<script>
+(() => {
+'use strict';
+const CFG = window.RENO_CONFIG || { firebase: {} };
+const LIVE = !!(CFG.firebase && CFG.firebase.apiKey);
+const STATUSES = [
+  { id: 'planned', label: 'Planned', cls: 's-planned', color: 'var(--planned)' },
+  { id: 'progress', label: 'In progress', cls: 's-progress', color: 'var(--progress)' },
+  { id: 'hold', label: 'On hold', cls: 's-hold', color: 'var(--hold)' },
+  { id: 'done', label: 'Done', cls: 's-done', color: 'var(--done)' }
+];
+const ST = Object.fromEntries(STATUSES.map(s => [s.id, s]));
+const FLOORS = ['Ground floor', '1st floor', '2nd floor', 'Terrace', 'Outside', 'All floors', 'Multiple', 'General'];
+const TRADES = ['Manager', 'Engineer', 'Civil', 'Carpentry', 'Lift', 'Electrical', 'Plumbing', 'Welding', 'Tiles', 'Painting', 'Solar', 'CCTV', 'Paperwork', 'Family', 'Other'];
+const ROLES = [
+  { id: 'owner', label: 'Owner' }, { id: 'manager', label: 'Manager' }, { id: 'engineer', label: 'Engineer' },
+  { id: 'contractor', label: 'Contractor' }, { id: 'family', label: 'Family' }
+];
+const PRIORITIES = ['High', 'Normal', 'Low'];
+const CONTRACTOR_FIELDS = ['status', 'progress', 'nextSteps', 'actualDate'];
+
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+const dayNum = iso => Math.round(Date.parse(iso + 'T00:00:00Z') / 864e5);
+const isoFromNum = n => new Date(n * 864e5).toISOString().slice(0, 10);
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtDate = iso => iso ? `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]}` : '';
+const fmtDateY = iso => iso ? `${fmtDate(iso)} ${iso.slice(0, 4)}` : '';
+const inr = n => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+const inrShort = n => { n = Number(n) || 0; if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr'; if (n >= 1e5) return '₹' + (n / 1e5).toFixed(2) + ' L'; return inr(n); };
+const initials = s => (s || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2600); }
+function isLate(it) { return it.status !== 'done' && it.plannedEnd && it.plannedEnd < todayISO(); }
+function statusPill(it) { const s = ST[it.status] || ST.planned; return `<span class="pill ${s.cls}">${s.label}</span>`; }
+
+/* ---------- state ---------- */
+const state = {
+  user: null, me: null, members: [], aspects: [], items: [], settings: {},
+  filters: Object.assign({ q: '', status: '', aspect: '', floor: '', trade: '', contact: '', role: '', mine: false, late: false }, lsGet('reno-filters') || {}),
+  ready: false
+};
+const role = () => state.me?.role || 'family';
+const roleLabel = r => (ROLES.find(x => x.id === r) || {}).label || '';
+const can = {
+  editAll: () => ['owner', 'manager', 'engineer'].includes(role()),
+  editProgress: () => ['owner', 'manager', 'engineer', 'contractor'].includes(role()),
+  deleteItem: () => ['owner', 'manager', 'engineer'].includes(role()),
+  deleteAspect: () => role() === 'owner',
+  members: () => role() === 'owner'
+};
+const deadline = () => state.settings.deadline || CFG.deadline || '2026-12-25';
+const projectName = () => state.settings.projectName || CFG.projectName || 'House Renovation';
+const memberName = email => { const m = state.members.find(m => m.email === email); return m ? (m.name || m.email) : (email || ''); };
+
+/* ---------- stores ---------- */
+function DemoStore() {
+  const KEY = 'reno-demo-v2';
+  let db = lsGet(KEY);
+  let listener = () => {};
+  const persist = () => { lsSet(KEY, db); listener(snapshot()); };
+  const snapshot = () => ({ members: db.members, aspects: db.aspects, items: db.items, settings: db.settings });
+  function fresh() {
+    const S = window.SEED || { aspects: [], items: [] };
+    const examples = { 'a01-01': ['done', 100], 'a01-02': ['done', 100], 'a01-03': ['progress', 60], 'a02-01': ['done', 100], 'a02-02': ['progress', 40], 'a04-01': ['progress', 30], 'a18-01': ['done', 100], 'a10-01': ['hold', 0] };
+    const t = dayNum(todayISO());
+    return {
+      settings: { projectName: CFG.projectName || 'Our House Renovation', deadline: CFG.deadline || '2026-12-25', budget: 0 },
+      members: [
+        { email: 'demo.owner@example.com', name: 'Demo Owner (you)', role: 'owner', trade: 'Family', phone: '' },
+        { email: 'site.manager@example.com', name: 'Example Site Manager', role: 'manager', trade: 'Manager', phone: '' },
+        { email: 'electrician@example.com', name: 'Example Electrician', role: 'contractor', trade: 'Electrical', phone: '' }
+      ],
+      aspects: S.aspects.map(a => ({ ...a })),
+      items: S.items.map(i => {
+        const ex = examples[i.id];
+        const o = { ...blankItem(), ...i, status: ex ? ex[0] : 'planned', progress: ex ? ex[1] : 0 };
+        if (ex) { o.plannedStart = isoFromNum(t - 20); o.daysRequired = 30; o.plannedEnd = isoFromNum(t + 9); }
+        if (ex && ex[0] === 'done') { o.plannedEnd = isoFromNum(t - 5); o.actualDate = isoFromNum(t - 6); o.estimate = 25000; o.actualSpent = 27500; }
+        if (i.id === 'a01-03') { o.plannedEnd = isoFromNum(t - 2); o.estimate = 18000; o.actualSpent = 9000; }
+        return o;
+      }),
+      comments: [], photos: []
+    };
+  }
+  if (!db || !db.items) db = fresh();
+  return {
+    mode: 'demo',
+    async start(onUser) { onUser({ email: db.meEmail || 'demo.owner@example.com', name: 'Demo Owner', photo: '' }); },
+    async member() { return db.members.find(m => m.email === (db.meEmail || 'demo.owner@example.com')); },
+    setMe(email) { db.meEmail = email; lsSet(KEY, db); },
+    subscribe(cb) { listener = cb; cb(snapshot()); },
+    async saveItem(id, data) { if (id) { Object.assign(db.items.find(i => i.id === id), data); } else { id = 'i' + uid(); db.items.push({ id, ...data }); } persist(); return id; },
+    async deleteItem(id) { db.items = db.items.filter(i => i.id !== id); persist(); },
+    async saveAspect(id, data) { if (id) Object.assign(db.aspects.find(a => a.id === id), data); else db.aspects.push({ id: 'a' + uid(), ...data }); persist(); },
+    async deleteAspect(id) { db.aspects = db.aspects.filter(a => a.id !== id); persist(); },
+    async saveMember(email, data) { const m = db.members.find(m => m.email === email); if (m) Object.assign(m, data); else db.members.push({ email, ...data }); persist(); },
+    async deleteMember(email) { db.members = db.members.filter(m => m.email !== email); persist(); },
+    async saveSettings(data) { Object.assign(db.settings, data); persist(); },
+    async comments(itemId) { return db.comments.filter(c => c.itemId === itemId); },
+    async addComment(c) { db.comments.push({ id: uid(), ...c, at: Date.now() }); if (!lsSet(KEY, db)) {} },
+    async photos(itemId) { return db.photos.filter(p => p.itemId === itemId); },
+    async addPhoto(p) { db.photos.push({ id: uid(), ...p, at: Date.now() }); if (!lsSet(KEY, db)) toast('Photo kept for this visit only: browser storage is full'); },
+    async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); },
+    async seed() {},
+    async signOut() {},
+    reset() { db = fresh(); state.user.email = 'demo.owner@example.com'; persist(); }
+  };
+}
+
+async function FirebaseStore() {
+  const V = '10.12.2', base = `https://www.gstatic.com/firebasejs/${V}/`;
+  const [appM, authM, fs] = await Promise.all([
+    import(base + 'firebase-app.js'), import(base + 'firebase-auth.js'), import(base + 'firebase-firestore.js')
+  ]);
+  const app = appM.initializeApp(CFG.firebase);
+  const auth = authM.getAuth(app);
+  let db;
+  try { db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
+  catch { db = fs.getFirestore(app); }
+  const col = n => fs.collection(db, n);
+  const stamp = () => ({ updatedBy: state.user.email, updatedAt: fs.serverTimestamp() });
+  const unsubs = [];
+  return {
+    mode: 'live',
+    start(onUser) {
+      authM.onAuthStateChanged(auth, u => onUser(u ? { email: (u.email || '').toLowerCase(), name: u.displayName || u.email, photo: u.photoURL || '' } : null));
+    },
+    async signIn() {
+      const p = new authM.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
+      try { await authM.signInWithPopup(auth, p); }
+      catch (e) { if (e.code === 'auth/popup-blocked') await authM.signInWithRedirect(auth, p); else throw e; }
+    },
+    async signOut() { unsubs.splice(0).forEach(u => u()); await authM.signOut(auth); },
+    async member(user) {
+      const ref = fs.doc(db, 'members', user.email);
+      try { const s = await fs.getDoc(ref); if (s.exists()) return s.data(); } catch {}
+      // First sign-in of the owner named in the security rules: create their own record.
+      try {
+        const m = { email: user.email, name: user.name, role: 'owner', trade: 'Family', phone: '', addedAt: fs.serverTimestamp() };
+        await fs.setDoc(ref, m); return m;
+      } catch { return null; }
+    },
+    subscribe(cb) {
+      const snap = { members: null, aspects: null, items: null, settings: null };
+      const fire = () => { if (Object.values(snap).every(v => v !== null)) cb({ ...snap }); };
+      const err = e => { console.error(e); toast('Lost connection to the database. Changes will sync when it is back.'); };
+      unsubs.push(fs.onSnapshot(col('members'), s => { snap.members = s.docs.map(d => ({ email: d.id, ...d.data() })); fire(); }, err));
+      unsubs.push(fs.onSnapshot(col('aspects'), s => { snap.aspects = s.docs.map(d => ({ id: d.id, ...d.data() })); fire(); }, err));
+      unsubs.push(fs.onSnapshot(col('items'), s => { snap.items = s.docs.map(d => ({ id: d.id, ...d.data() })); fire(); }, err));
+      unsubs.push(fs.onSnapshot(fs.doc(db, 'settings', 'main'), s => { snap.settings = s.exists() ? s.data() : {}; fire(); }, err));
+    },
+    async saveItem(id, data) {
+      if (id) { await fs.updateDoc(fs.doc(db, 'items', id), { ...data, ...stamp() }); return id; }
+      const r = await fs.addDoc(col('items'), { ...data, ...stamp() }); return r.id;
+    },
+    async deleteItem(id) { await fs.deleteDoc(fs.doc(db, 'items', id)); },
+    async saveAspect(id, data) { if (id) await fs.updateDoc(fs.doc(db, 'aspects', id), data); else await fs.addDoc(col('aspects'), data); },
+    async deleteAspect(id) { await fs.deleteDoc(fs.doc(db, 'aspects', id)); },
+    async saveMember(email, data) { await fs.setDoc(fs.doc(db, 'members', email), { email, ...data }, { merge: true }); },
+    async deleteMember(email) { await fs.deleteDoc(fs.doc(db, 'members', email)); },
+    async saveSettings(data) { await fs.setDoc(fs.doc(db, 'settings', 'main'), data, { merge: true }); },
+    async comments(itemId) {
+      const s = await fs.getDocs(fs.query(col('comments'), fs.where('itemId', '==', itemId)));
+      return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
+    },
+    async addComment(c) { await fs.addDoc(col('comments'), { ...c, at: fs.serverTimestamp() }); },
+    async photos(itemId) {
+      const s = await fs.getDocs(fs.query(col('photos'), fs.where('itemId', '==', itemId)));
+      return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
+    },
+    async addPhoto(p) { await fs.addDoc(col('photos'), { ...p, at: fs.serverTimestamp() }); },
+    async deletePhoto(id) { await fs.deleteDoc(fs.doc(db, 'photos', id)); },
+    async seed(S) {
+      const b = fs.writeBatch(db);
+      S.aspects.forEach(a => b.set(fs.doc(db, 'aspects', a.id), { name: a.name, floor: a.floor, order: a.order, notes: '' }));
+      S.items.forEach(i => { const { id, ...rest } = i; b.set(fs.doc(db, 'items', id), { ...blankItem(), ...rest, ...stamp() }); });
+      b.set(fs.doc(db, 'settings', 'main'), { projectName: CFG.projectName || 'Our House Renovation', deadline: CFG.deadline || '2026-12-25', budget: 0 }, { merge: true });
+      await b.commit();
+    }
+  };
+}
+
+function blankItem() {
+  return { aspectId: '', title: '', nextSteps: '', contact: '', trade: '', floor: '', status: 'planned', progress: 0, daysRequired: '', plannedStart: '', plannedEnd: '', actualDate: '', estimate: '', actualSpent: '', priority: 'Normal', order: 999 };
+}
+
+let store;
+
+/* ---------- boot ---------- */
+async function boot() {
+  try { store = LIVE ? await FirebaseStore() : DemoStore(); }
+  catch (e) { console.error(e); return renderGate('error', 'Could not reach Google services. Check your internet connection and reload.'); }
+  store.start(async user => {
+    state.user = user;
+    if (!user) return renderGate('signin');
+    renderGate('loading');
+    const me = await store.member(user);
+    if (!me) return renderGate('denied');
+    if (me.disabled) return renderGate('disabled');
+    state.me = me;
+    store.subscribe(snap => {
+      Object.assign(state, snap, { ready: true });
+      const fresh = state.members.find(m => m.email === user.email);
+      if (fresh) state.me = fresh;
+      render();
+    });
+  });
+}
+
+function renderGate(kind, msg) {
+  const app = $('#app');
+  const G = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+  let body = '';
+  if (kind === 'signin') body = `<p class="muted">Sign in with the Google account the owner added to the project.</p><button class="gbtn" id="gsign">${G} Sign in with Google</button><p class="small muted" id="gerr"></p>`;
+  else if (kind === 'denied') body = `<p><b>${esc(state.user.email)}</b> is not on the project list yet.</p><p class="muted">Ask the owner to add this Gmail address under Team, then sign in again.</p><button class="btn" id="gout">Use a different account</button>`;
+  else if (kind === 'disabled') body = `<p>Access for <b>${esc(state.user.email)}</b> has been turned off.</p><p class="muted">Ask the owner to enable it again on the Team page.</p><button class="btn" id="gout">Use a different account</button>`;
+  else if (kind === 'error') body = `<p class="muted">${esc(msg)}</p>`;
+  else body = '<p class="muted">Loading the project…</p>';
+  app.innerHTML = `<div class="gate"><div class="box"><h1>House Renovation Tracker</h1>${body}</div></div>`;
+  $('#gsign')?.addEventListener('click', async () => {
+    try { await store.signIn(); } catch (e) { $('#gerr').textContent = e.code === 'auth/unauthorized-domain' ? 'This web address is not yet allowed in Firebase (Authentication > Settings > Authorized domains).' : 'Sign-in did not complete. Please try again.'; }
+  });
+  $('#gout')?.addEventListener('click', () => store.signOut());
+}
+
+/* ---------- shell ---------- */
+const VIEWS = [
+  { id: 'dashboard', label: 'Dashboard' }, { id: 'items', label: 'Items' }, { id: 'board', label: 'Board' },
+  { id: 'timeline', label: 'Timeline' }, { id: 'aspects', label: 'Aspects' }, { id: 'team', label: 'Team' }
+];
+const currentView = () => { const h = location.hash.slice(1); return VIEWS.some(v => v.id === h) ? h : 'dashboard'; };
+window.addEventListener('hashchange', () => { if (state.ready) render(); window.scrollTo(0, 0); });
+
+function render() {
+  const v = currentView();
+  const u = state.user;
+  const demoBanner = store.mode === 'demo' ? `<div class="banner"><div class="wrap"><span><b>Demo.</b> Your Excel items are loaded; the few statuses, dates and amounts already filled in are examples. Changes stay in this browser only.</span></div></div>` : '';
+  $('#app').innerHTML = `
+    <header class="topbar"><div class="wrap">
+      <div class="brand"><b>${esc(projectName())}</b><span>G+2 with terrace · hand-over ${fmtDateY(deadline())}</span></div>
+      <nav class="tabs" aria-label="Sections">${VIEWS.map(x => `<a href="#${x.id}" ${x.id === v ? 'aria-current="page"' : ''}>${x.label}</a>`).join('')}</nav>
+      <div class="who"><div class="avatar" title="${esc(u.email)}">${u.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">` : initials(u.name)}</div>
+        <span class="name small">${esc(u.name)}<br><span class="muted">${esc((ROLES.find(r => r.id === role()) || {}).label)}</span></span>
+        ${store.mode === 'live' ? '<button class="btn sm ghost" id="signout">Sign out</button>' : ''}</div>
+    </div></header>
+    ${demoBanner}
+    <main class="wrap" id="main"></main>`;
+  $('#signout')?.addEventListener('click', () => store.signOut());
+  const main = $('#main');
+  ({ dashboard: viewDashboard, items: viewItems, board: viewBoard, timeline: viewTimeline, aspects: viewAspects, team: viewTeam })[v](main);
+}
+
+function sortedAspects() { return [...state.aspects].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name)); }
+function aspectName(id) { return state.aspects.find(a => a.id === id)?.name || 'Unsorted'; }
+function itemsOf(aid) { return state.items.filter(i => i.aspectId === aid).sort((a, b) => (a.order ?? 999) - (b.order ?? 999)); }
+function avgProgress(items) { if (!items.length) return 0; return Math.round(items.reduce((s, i) => s + (i.status === 'done' ? 100 : Number(i.progress) || 0), 0) / items.length); }
+
+function setFilters(f, go = 'items') { state.filters = Object.assign({ q: '', status: '', aspect: '', floor: '', trade: '', contact: '', role: '', mine: false, late: false }, f); lsSet('reno-filters', state.filters); if (currentView() === go) render(); else location.hash = go; }
+
+/* ---------- dashboard ---------- */
+function viewDashboard(main) {
+  const items = state.items;
+  const today = todayISO();
+  const daysLeft = dayNum(deadline()) - dayNum(today);
+  const counts = Object.fromEntries(STATUSES.map(s => [s.id, items.filter(i => (i.status || 'planned') === s.id).length]));
+  const late = items.filter(isLate).sort((a, b) => a.plannedEnd.localeCompare(b.plannedEnd));
+  const in7 = isoFromNum(dayNum(today) + 7);
+  const soon = items.filter(i => i.status !== 'done' && i.plannedEnd && i.plannedEnd >= today && i.plannedEnd <= in7).sort((a, b) => a.plannedEnd.localeCompare(b.plannedEnd));
+  const est = items.reduce((s, i) => s + (Number(i.estimate) || 0), 0);
+  const spent = items.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0);
+  const budget = Number(state.settings.budget) || 0;
+  const undated = items.filter(i => i.status !== 'done' && !i.plannedEnd).length;
+  const pct = avgProgress(items);
+
+  const row = i => `<div class="list-row" data-open="${esc(i.id)}"><div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.contact ? ' · ' + esc(memberName(i.contact)) : ''}</span></div><span class="small num ${isLate(i) ? '' : 'muted'}" style="${isLate(i) ? 'color:var(--late)' : ''}">${fmtDate(i.plannedEnd)}</span>${statusPill(i)}</div>`;
+
+  main.innerHTML = `
+    <div class="section-head"><div><h1>Where the renovation stands</h1><p>${items.length} items across ${state.aspects.length} aspects · today ${fmtDateY(today)}</p></div>
+      <div class="row-actions">${can.editAll() ? '<button class="btn primary" data-add-item>+ Add item</button>' : ''}</div></div>
+    ${items.length === 0 ? seedPanel() : ''}
+    <div class="kpis">
+      <div class="kpi countdown"><div class="label">Days to hand-over</div><div class="value num">${daysLeft >= 0 ? daysLeft : 'Over by ' + -daysLeft}</div><div class="sub">${fmtDateY(deadline())}</div></div>
+      <div class="kpi"><div class="label">Overall progress</div><div class="value num">${pct}%</div><div class="bar" style="margin-top:6px"><i style="width:${pct}%"></i></div></div>
+      ${STATUSES.map(s => `<button class="kpi" data-filter-status="${s.id}"><div class="label">${s.label}</div><div class="value num" style="color:${s.color}">${counts[s.id]}</div><div class="sub">items</div></button>`).join('')}
+      <button class="kpi" data-filter-late><div class="label">Overdue</div><div class="value num" style="color:${late.length ? 'var(--late)' : 'inherit'}">${late.length}</div><div class="sub">past planned end</div></button>
+    </div>
+    <div class="grid2">
+      <section class="panel"><h2>Overdue</h2><div class="list">${late.length ? late.slice(0, 8).map(row).join('') : '<div class="empty">Nothing overdue.</div>'}</div>
+        <h2 style="margin-top:22px">Due in the next 7 days</h2><div class="list">${soon.length ? soon.slice(0, 8).map(row).join('') : `<div class="empty">Nothing due this week.${undated ? ` ${undated} open items have no planned end date yet.` : ''}</div>`}</div>
+      </section>
+      <section class="panel"><h2>Money</h2>
+        <div class="money"><div><span class="small muted">Estimated</span><b class="num">${inrShort(est)}</b></div><div><span class="small muted">Spent so far</span><b class="num">${inrShort(spent)}</b></div><div><span class="small muted">${budget ? 'Budget left' : 'Budget'}</span><b class="num">${budget ? inrShort(budget - spent) : '<span class="small muted">Not set</span>'}</b></div></div>
+        ${budget ? `<div class="bar"><i style="width:${Math.min(100, spent / budget * 100)}%;background:${spent > budget ? 'var(--late)' : 'var(--accent)'}"></i></div><p class="small muted">${Math.round(spent / budget * 100)}% of ${inr(budget)} budget spent</p>` : `<p class="small muted">${can.editAll() ? 'The Owner can set an overall budget on the Team page.' : ''}</p>`}
+        <h2 style="margin-top:22px">Progress by aspect</h2>
+        <div class="legend">${STATUSES.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}</div>
+        <div>${sortedAspects().map(a => { const its = itemsOf(a.id); const n = its.length || 1; return `<div class="aspect-prog" data-filter-aspect="${esc(a.id)}"><span>${esc(a.name)}</span><div class="stack">${STATUSES.map(s => { const c = its.filter(i => (i.status || 'planned') === s.id).length; return c ? `<i style="width:${c / n * 100}%;background:${s.color}" title="${s.label}: ${c}"></i>` : ''; }).join('')}</div><span class="small muted num">${its.filter(i => i.status === 'done').length}/${its.length}</span></div>`; }).join('')}</div>
+      </section>
+    </div>`;
+  wireCommon(main);
+  main.querySelectorAll('[data-filter-status]').forEach(b => b.onclick = () => setFilters({ status: b.dataset.filterStatus }));
+  main.querySelector('[data-filter-late]').onclick = () => setFilters({ late: true });
+  main.querySelectorAll('[data-filter-aspect]').forEach(b => b.onclick = () => setFilters({ aspect: b.dataset.filterAspect }));
+}
+
+function seedPanel() {
+  if (role() !== 'owner' || !window.SEED) return '<p class="empty">No items yet.</p>';
+  return `<div class="kpi" style="margin-bottom:20px"><b>The project is empty.</b><p class="muted" style="margin:6px 0 10px">Load the ${window.SEED.items.length} items from your Excel plan (${window.SEED.aspects.length} aspects). Everything starts as Planned; you can then mark what is done or in progress.</p><button class="btn primary" id="seedBtn">Load Excel plan</button></div>`;
+}
+
+function wireCommon(root) {
+  root.querySelectorAll('[data-open]').forEach(el => el.addEventListener('click', e => { if (e.target.closest('select,button:not([data-open]),a')) return; openItem(el.dataset.open); }));
+  root.querySelectorAll('[data-add-item]').forEach(b => b.onclick = () => openItem(null, { aspectId: b.dataset.addItem || '' }));
+  const sb = $('#seedBtn', root); if (sb) sb.onclick = async () => { sb.disabled = true; sb.textContent = 'Loading…'; try { await store.seed(window.SEED); toast('Excel plan loaded'); } catch (e) { console.error(e); toast('Could not load the plan. Check the security rules.'); sb.disabled = false; } };
+  root.querySelectorAll('select[data-status-of]').forEach(s => s.onchange = () => quickStatus(s.dataset.statusOf, s.value));
+}
+
+async function quickStatus(id, status) {
+  const it = state.items.find(i => i.id === id); if (!it) return;
+  const patch = { status };
+  if (status === 'done') { patch.progress = 100; if (!it.actualDate) patch.actualDate = todayISO(); }
+  if (status === 'progress' && !(Number(it.progress) > 0)) patch.progress = 10;
+  try { await store.saveItem(id, patch); logChanges(it, patch); toast(`${it.title}: ${ST[status].label}`); }
+  catch (e) { console.error(e); toast('You do not have permission to change this.'); render(); }
+}
+
+/* ---------- items ---------- */
+function filteredItems() {
+  const f = state.filters, q = f.q.trim().toLowerCase();
+  return state.items.filter(i =>
+    (!f.status || (i.status || 'planned') === f.status) && (!f.aspect || i.aspectId === f.aspect) && (!f.floor || i.floor === f.floor) &&
+    (!f.trade || i.trade === f.trade) && (!f.contact || i.contact === f.contact) && (!f.role || (state.members.find(m => m.email === i.contact) || {}).role === f.role) && (!f.mine || i.contact === state.user.email) && (!f.late || isLate(i)) &&
+    (!q || [i.title, i.nextSteps, aspectName(i.aspectId), memberName(i.contact), i.trade, i.floor].join(' ').toLowerCase().includes(q)));
+}
+function statusSelect(it) {
+  const s = ST[it.status] || ST.planned;
+  if (!can.editProgress()) return statusPill(it);
+  return `<select class="status-select ${s.cls}" data-status-of="${esc(it.id)}" aria-label="Status of ${esc(it.title)}">${STATUSES.map(x => `<option value="${x.id}" ${x.id === s.id ? 'selected' : ''}>${x.label}</option>`).join('')}</select>`;
+}
+function filterBar() {
+  const f = state.filters, opt = (v, l, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
+  return `<div class="filters">
+    <input type="search" id="fq" placeholder="Search items, notes, people" value="${esc(f.q)}" aria-label="Search">
+    <select id="fstatus" aria-label="Status">${opt('', 'All statuses', f.status)}${STATUSES.map(s => opt(s.id, s.label, f.status)).join('')}</select>
+    <select id="faspect" aria-label="Aspect">${opt('', 'All aspects', f.aspect)}${sortedAspects().map(a => opt(a.id, a.name, f.aspect)).join('')}</select>
+    <select id="ffloor" aria-label="Floor">${opt('', 'All floors', f.floor)}${FLOORS.map(x => opt(x, x, f.floor)).join('')}</select>
+    <select id="ftrade" aria-label="Trade">${opt('', 'All trades', f.trade)}${TRADES.map(x => opt(x, x, f.trade)).join('')}</select>
+    <select id="frole" aria-label="Point of contact's role">${opt('', 'Any role', f.role)}${['owner', 'manager', 'engineer', 'contractor', 'family'].map(r => opt(r, ROLES.find(x => x.id === r).label, f.role)).join('')}</select>
+    ${f.contact ? `<span class="pill s-planned">${esc(memberName(f.contact))}<button class="btn sm ghost" id="fcontactx" aria-label="Show everyone" style="padding:0 2px">✕</button></span>` : ''}
+    <label class="chk small"><input type="checkbox" id="fmine" ${f.mine ? 'checked' : ''}> My jobs</label>
+    <label class="chk small"><input type="checkbox" id="flate" ${f.late ? 'checked' : ''}> Overdue</label>
+    ${Object.entries(f).some(([k, v]) => v) ? '<button class="btn sm ghost" id="fclear">Clear</button>' : ''}
+  </div>`;
+}
+function wireFilters(main, rerender) {
+  const upd = () => { lsSet('reno-filters', state.filters); rerender(); };
+  const fq = $('#fq', main); fq.oninput = () => { state.filters.q = fq.value; clearTimeout(fq.t); fq.t = setTimeout(() => { upd(); const n = $('#fq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+  [['fstatus', 'status'], ['faspect', 'aspect'], ['ffloor', 'floor'], ['ftrade', 'trade'], ['frole', 'role']].forEach(([id, k]) => $('#' + id, main).onchange = e => { state.filters[k] = e.target.value; upd(); });
+  $('#fmine', main).onchange = e => { state.filters.mine = e.target.checked; upd(); };
+  $('#flate', main).onchange = e => { state.filters.late = e.target.checked; upd(); };
+  const cx = $('#fcontactx', main); if (cx) cx.onclick = () => { state.filters.contact = ''; upd(); };
+  const c = $('#fclear', main); if (c) c.onclick = () => setFilters({}, currentView());
+}
+
+function viewItems(main) {
+  const list = filteredItems();
+  const groups = sortedAspects().map(a => ({ a, its: list.filter(i => i.aspectId === a.id).sort((x, y) => (x.order ?? 999) - (y.order ?? 999)) }));
+  const orphan = list.filter(i => !state.aspects.some(a => a.id === i.aspectId));
+  if (orphan.length) groups.push({ a: { id: '', name: 'Unsorted' }, its: orphan });
+  const filtering = Object.values(state.filters).some(Boolean);
+  main.innerHTML = `
+    <div class="section-head"><div><h1>Items</h1><p>${list.length} of ${state.items.length} items shown</p></div>
+      <div class="row-actions"><button class="btn" id="exportCsv">Export to Excel (CSV)</button>${can.editAll() ? '<button class="btn primary" data-add-item>+ Add item</button>' : ''}</div></div>
+    ${state.items.length === 0 ? seedPanel() : ''}
+    ${filterBar()}
+    ${groups.filter(g => g.its.length || !filtering).map(({ a, its }) => `
+      <section class="group">
+        <div class="group-head"><h2>${esc(a.name)}</h2><span class="small muted">${a.floor ? esc(a.floor) + ' · ' : ''}${its.length} item${its.length === 1 ? '' : 's'}</span><div class="bar"><i style="width:${avgProgress(its)}%"></i></div>
+          <span style="margin-left:auto"></span>${can.editAll() && a.id ? `<button class="btn sm ghost" data-add-item="${esc(a.id)}">+ Item</button>` : ''}</div>
+        ${its.map(i => `<div class="item-row">
+          <div>${statusSelect(i)}</div>
+          <div class="title" data-open="${esc(i.id)}"><b>${esc(i.title)}</b><div class="meta">${i.trade ? `<span class="tag">${esc(i.trade)}</span>` : ''}${i.floor ? `<span class="tag">${esc(i.floor)}</span>` : ''}${i.priority === 'High' ? '<span class="tag" style="color:var(--late)">High priority</span>' : ''}${i.nextSteps ? esc(i.nextSteps.slice(0, 90)) + (i.nextSteps.length > 90 ? '…' : '') : ''}</div></div>
+          <div class="c-contact small">${i.contact ? esc(memberName(i.contact)) : '<span class="muted">No contact</span>'}</div>
+          <div class="c-dates small num">${i.plannedEnd ? `<span style="${isLate(i) ? 'color:var(--late);font-weight:600' : ''}">Due ${fmtDate(i.plannedEnd)}</span>` : '<span class="muted">No date</span>'}${i.estimate ? `<br><span class="muted">${inrShort(i.actualSpent || 0)} / ${inrShort(i.estimate)}</span>` : ''}</div>
+          <div class="c-prog"><div class="bar"><i style="width:${i.status === 'done' ? 100 : Number(i.progress) || 0}%"></i></div><span class="small muted num">${i.status === 'done' ? 100 : Number(i.progress) || 0}%</span></div>
+        </div>`).join('') || '<div class="empty">No items yet.</div>'}
+      </section>`).join('') || '<p class="empty">No items match these filters.</p>'}`;
+  wireCommon(main); wireFilters(main, () => viewItems(main));
+  $('#exportCsv', main).onclick = exportCsv;
+}
+
+function exportCsv() {
+  const cols = ['Aspect', 'Details', 'Requirement/Next Steps', 'Point of Contact', 'Contact Role', 'Trade', 'Floor', 'Status', 'Progress %', 'No. of Days Required', 'Planned Start', 'Planned Date', 'Actual Date', 'Estimate', 'Actual Spent', 'Priority'];
+  const rows = [];
+  sortedAspects().forEach(a => itemsOf(a.id).forEach(i => rows.push([a.name, i.title, i.nextSteps, memberName(i.contact), roleLabel((state.members.find(m => m.email === i.contact) || {}).role), i.trade, i.floor, (ST[i.status] || ST.planned).label, i.status === 'done' ? 100 : i.progress, i.daysRequired, i.plannedStart, i.plannedEnd, i.actualDate, i.estimate, i.actualSpent, i.priority])));
+  const csv = [cols, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const filename = `renovation-${todayISO()}.csv`;
+  if (window.claude) {
+    // Inside the Claude demo page, files go through Claude's save prompt
+    dlNS.then(dl => {
+      if (!dl) return toast('Saving files is not available here. It works in the live app.');
+      dl.save({ filename, data: '\ufeff' + csv }).then(() => toast('Saved ' + filename)).catch(e => toast(e && e.code === 'declined' ? 'Export cancelled' : 'Could not save the file here. It works in the live app.'));
+    });
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv' }));
+  a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  toast('Downloaded ' + filename + '. It opens in Excel.');
+}
+const dlNS = window.claude?.use ? window.claude.use('downloads').catch(() => null) : Promise.resolve(null);
+
+/* ---------- board ---------- */
+function viewBoard(main) {
+  const list = filteredItems();
+  main.innerHTML = `<div class="section-head"><div><h1>Board</h1><p>${can.editProgress() ? 'Drag a card to another column, or change its status on the card.' : 'Items by status.'}</p></div></div>
+    ${filterBar()}
+    <div class="board">${STATUSES.map(s => { const its = list.filter(i => (i.status || 'planned') === s.id); return `<div class="col" data-col="${s.id}"><h2><span>${s.label}</span><span class="muted num">${its.length}</span></h2>
+      ${its.map(i => `<div class="card" draggable="${can.editProgress()}" data-id="${esc(i.id)}" data-open="${esc(i.id)}"><b>${esc(i.title)}</b><div class="meta">${esc(aspectName(i.aspectId))}${i.contact ? ' · ' + esc(memberName(i.contact)) : ''}${i.plannedEnd ? ` · <span style="${isLate(i) ? 'color:var(--late)' : ''}">due ${fmtDate(i.plannedEnd)}</span>` : ''}</div>
+        <div class="bar"><i style="width:${i.status === 'done' ? 100 : Number(i.progress) || 0}%"></i></div></div>`).join('')}</div>`; }).join('')}</div>`;
+  wireCommon(main); wireFilters(main, () => viewBoard(main));
+  if (!can.editProgress()) return;
+  main.querySelectorAll('.card').forEach(c => c.ondragstart = e => { e.dataTransfer.setData('text/plain', c.dataset.id); });
+  main.querySelectorAll('.col').forEach(col => {
+    col.ondragover = e => { e.preventDefault(); col.classList.add('drop'); };
+    col.ondragleave = () => col.classList.remove('drop');
+    col.ondrop = e => { e.preventDefault(); col.classList.remove('drop'); const id = e.dataTransfer.getData('text/plain'); const it = state.items.find(i => i.id === id); if (it && it.status !== col.dataset.col) quickStatus(id, col.dataset.col); };
+  });
+}
+
+/* ---------- timeline ---------- */
+function viewTimeline(main) {
+  const dated = state.items.filter(i => i.plannedStart || i.plannedEnd);
+  const today = todayISO();
+  const starts = dated.map(i => dayNum(i.plannedStart || i.plannedEnd)), ends = dated.map(i => dayNum(i.plannedEnd || i.plannedStart));
+  let lo = Math.min(dayNum(today) - 7, ...starts), hi = Math.max(dayNum(deadline()) + 5, ...ends);
+  const span = Math.max(1, hi - lo);
+  const X = n => ((n - lo) / span * 100).toFixed(3) + '%';
+  const ticks = [];
+  if (span <= 120) { let n = lo + ((4 - (lo % 7)) + 7) % 7; while (n < hi) { ticks.push([n, fmtDate(isoFromNum(n))]); n += 7; } } // weekly, on Mondays
+  else { const d = new Date(lo * 864e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + 1); while (d.getTime() / 864e5 < hi) { ticks.push([Math.round(d.getTime() / 864e5), `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`]); d.setUTCMonth(d.getUTCMonth() + 1); } }
+  const undated = state.items.length - dated.length;
+  const rows = sortedAspects().map(a => { const its = itemsOf(a.id).filter(i => i.plannedStart || i.plannedEnd); if (!its.length) return ''; return `<div class="tl-row grp"><div class="tl-name">${esc(a.name)}</div><div class="tl-track"></div></div>` + its.map(i => { const s = dayNum(i.plannedStart || i.plannedEnd), e = dayNum(i.plannedEnd || i.plannedStart); const st = ST[i.status] || ST.planned; const col = isLate(i) ? 'var(--late)' : st.color; return `<div class="tl-row"><div class="tl-name" data-open="${esc(i.id)}" title="${esc(i.title)}">${esc(i.title)}</div><div class="tl-track"><div class="tl-bar" data-open="${esc(i.id)}" title="${esc(i.title)}: ${fmtDate(i.plannedStart)} to ${fmtDate(i.plannedEnd)}" style="left:${X(s)};width:max(6px, calc(${X(e + 1)} - ${X(s)}));background:${col}"></div></div></div>`; }).join(''); }).join('');
+  main.innerHTML = `<div class="section-head"><div><h1>Timeline</h1><p>Planned start to planned end for each dated item. Blue line is today, red dashed line is the ${fmtDate(deadline())} hand-over.</p></div></div>
+    <div class="legend">${STATUSES.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}<span><i style="background:var(--late)"></i>Overdue</span></div>
+    ${dated.length ? `<div class="tl-wrap"><div class="tl">
+      <div class="tl-row head"><div class="tl-name">Item</div><div class="tl-track">${ticks.filter(([t]) => (t - lo) / span < 0.95).map(([t, l]) => `<div class="tl-tick" style="left:${X(t)}"><span>${l}</span></div>`).join('')}</div></div>
+      <div style="position:relative">${rows}
+        <div style="position:absolute;inset:0 0 0 240px;pointer-events:none"><div class="tl-line today" style="left:${X(dayNum(today))}"></div><div class="tl-line" style="left:${X(dayNum(deadline()))}"></div></div></div>
+    </div></div>` : ''}
+    <p class="muted small" style="margin-top:12px">${undated ? `${undated} item${undated === 1 ? ' has' : 's have'} no planned dates yet. Open an item and set a planned start and days required to place it here.` : 'Every item has dates.'}</p>`;
+  wireCommon(main);
+}
+
+/* ---------- aspects ---------- */
+function viewAspects(main) {
+  const asp = sortedAspects();
+  main.innerHTML = `<div class="section-head"><div><h1>Renovation aspects</h1><p>The areas of work, such as Kitchen or Lift. Add one whenever something new comes up.</p></div>
+    ${can.editAll() ? '<button class="btn primary" id="addAspect">+ Add aspect</button>' : ''}</div>
+    <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Aspect</th><th>Floor</th><th>Items</th><th>Done</th><th>Spent / Estimate</th><th></th></tr></thead><tbody>
+    ${asp.map((a, n) => { const its = itemsOf(a.id); const e = its.reduce((s, i) => s + (Number(i.estimate) || 0), 0), sp = its.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0); return `<tr>
+      <td class="num muted">${n + 1}</td><td><b>${esc(a.name)}</b>${a.notes ? `<div class="small muted">${esc(a.notes)}</div>` : ''}</td><td>${esc(a.floor || '')}</td><td class="num">${its.length}</td><td class="num">${its.filter(i => i.status === 'done').length}</td><td class="num small">${e || sp ? `${inrShort(sp)} / ${inrShort(e)}` : '<span class="muted">None yet</span>'}</td>
+      <td style="white-space:nowrap">${can.editAll() ? `<button class="btn sm ghost" data-up="${n}" aria-label="Move up" ${n === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-down="${n}" aria-label="Move down" ${n === asp.length - 1 ? 'disabled' : ''}>↓</button><button class="btn sm" data-edit-aspect="${esc(a.id)}">Edit</button> <button class="btn sm" data-add-item="${esc(a.id)}">+ Item</button>` : `<button class="btn sm" onclick="location.hash='items'">View</button>`}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
+  wireCommon(main);
+  $('#addAspect', main)?.addEventListener('click', () => editAspect(null));
+  main.querySelectorAll('[data-edit-aspect]').forEach(b => b.onclick = () => editAspect(b.dataset.editAspect));
+  const swap = async (i, j) => { const A = asp[i], B = asp[j]; await Promise.all(asp.map((x, k) => store.saveAspect(x.id, { order: k === i ? j + 1 : k === j ? i + 1 : k + 1 }))); };
+  main.querySelectorAll('[data-up]').forEach(b => b.onclick = () => swap(+b.dataset.up, +b.dataset.up - 1));
+  main.querySelectorAll('[data-down]').forEach(b => b.onclick = () => swap(+b.dataset.down, +b.dataset.down + 1));
+}
+
+function editAspect(id) {
+  const a = id ? state.aspects.find(x => x.id === id) : { name: '', floor: '', notes: '' };
+  const n = id ? itemsOf(id).length : 0;
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form method="dialog" id="af"><div class="dlg-head"><h2>${id ? 'Edit aspect' : 'New renovation aspect'}</h2><button class="btn" type="button" data-close>← Back</button></div>
+    <div class="dlg-body"><div class="form">
+      <label class="full">Name<input class="field" id="a_name" required value="${esc(a.name)}" placeholder="e.g. First floor balcony"></label>
+      <label>Floor<select class="field" id="a_floor"><option value=""></option>${FLOORS.map(f => `<option ${f === a.floor ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
+      <label class="full">Notes<textarea class="field" id="a_notes">${esc(a.notes || '')}</textarea></label>
+    </div>
+    <div class="row-actions"><button class="btn primary" value="save">Save</button><button class="btn" type="button" data-close>Cancel</button>${id && can.deleteAspect() ? `<button class="btn danger" type="button" id="a_del">Delete aspect</button>` : ''}<span class="small muted" id="a_msg"></span></div></div></form>`;
+  dlg.showModal();
+  $('#af').onsubmit = async e => {
+    if (e.submitter?.value !== 'save') return;
+    e.preventDefault();
+    const data = { name: $('#a_name').value.trim(), floor: $('#a_floor').value, notes: $('#a_notes').value.trim() };
+    if (!data.name) return;
+    if (!id) data.order = Math.max(0, ...state.aspects.map(x => x.order || 0)) + 1;
+    try { await store.saveAspect(id, data); dlg.close(); toast(id ? 'Aspect saved' : 'Aspect added'); } catch (err) { console.error(err); $('#a_msg').textContent = 'Could not save. You may not have permission.'; }
+  };
+  const del = $('#a_del');
+  if (del) del.onclick = async () => {
+    if (n) { $('#a_msg').textContent = `Move or delete its ${n} items first.`; return; }
+    if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'Tap again to delete'; return; }
+    await store.deleteAspect(id); dlg.close(); toast('Aspect deleted');
+  };
+}
+
+/* ---------- team ---------- */
+function viewTeam(main) {
+  const ms = [...state.members].sort((a, b) => ROLES.findIndex(r => r.id === a.role) - ROLES.findIndex(r => r.id === b.role) || (a.name || '').localeCompare(b.name || ''));
+  main.innerHTML = `<div class="section-head"><div><h1>Team</h1><p>Access is limited to the people listed below, who sign in with their Gmail address. Only Owners can add, change or remove team members and project settings.</p>${can.members() ? '' : '<p class="small" style="margin-top:6px"><span class="pill s-planned">View only</span></p>'}</div>
+    ${can.members() ? '<button class="btn primary" id="addMember">+ Add person</button>' : ''}</div>
+    <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Trade</th><th>Phone</th><th>Open items</th><th></th></tr></thead><tbody>
+    ${ms.map(m => { const open = state.items.filter(i => i.contact === m.email && i.status !== 'done').length; return `<tr class="${m.disabled ? 'is-off' : ''}"><td><b>${esc(m.name || m.email)}</b>${m.disabled ? ' <span class="pill s-late">Disabled</span>' : ''}<div class="small muted">${esc(m.email)}</div></td><td>${esc((ROLES.find(r => r.id === m.role) || {}).label || m.role)}</td><td>${esc(m.trade || '')}</td><td class="num">${m.phone ? `<a href="tel:${esc(m.phone.replace(/[^\d+]/g, ''))}">${esc(m.phone)}</a>` : ''}</td>
+      <td class="num">${open ? `<button class="btn sm ghost" data-contact="${esc(m.email)}">${open}</button>` : '0'}</td><td style="white-space:nowrap">${can.members() ? `<button class="btn sm" data-edit-member="${esc(m.email)}">Edit</button> <span class="seg" role="group" aria-label="Access for ${esc(m.name || m.email)}"><button class="btn sm" data-access="on" data-email="${esc(m.email)}" aria-pressed="${!m.disabled}">Enable</button><button class="btn sm" data-access="off" data-email="${esc(m.email)}" aria-pressed="${!!m.disabled}">Disable</button></span> <button class="btn sm danger" data-remove="${esc(m.email)}">Remove</button>` : ''}</td></tr>`; }).join('')}
+    </tbody></table></div>
+    ${can.members() ? `<section class="panel" style="margin-top:32px;max-width:560px"><h2>Project settings</h2><form id="sf" class="form">
+      <label class="full">Project name<input class="field" id="s_name" value="${esc(projectName())}"></label>
+      <label>Hand-over date<input class="field" type="date" id="s_deadline" value="${esc(deadline())}"></label>
+      <label>Overall budget (₹)<input class="field num" type="number" min="0" step="1000" id="s_budget" value="${esc(state.settings.budget || '')}"></label>
+      <div><button class="btn primary">Save settings</button></div></form></section>` : ''}
+    <section class="panel" style="margin-top:32px;max-width:640px"><h2>What each role can do</h2>
+      <div class="tbl-wrap"><table><tbody>
+      <tr><td><b>Owner</b></td><td>Everything. Only Owners can manage the team and project settings.</td></tr>
+      <tr><td><b>Manager</b></td><td>Add and edit any aspect or item, dates and money.</td></tr>
+      <tr><td><b>Engineer</b></td><td>Same as Manager: add and edit any aspect or item, dates and money.</td></tr>
+      <tr><td><b>Contractor</b></td><td>Update status, progress, next steps and completion date; add photos and comments.</td></tr>
+      <tr><td><b>Family</b></td><td>See everything; add photos and comments.</td></tr></tbody></table></div></section>`;
+  $('#addMember', main)?.addEventListener('click', () => editMember(null));
+  main.querySelectorAll('[data-edit-member]').forEach(b => b.onclick = () => editMember(b.dataset.editMember));
+  main.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => { const m = state.members.find(x => x.email === b.dataset.remove); if (m) confirmRemove(m, b, toast); });
+  main.querySelectorAll('[data-access]').forEach(b => b.onclick = async () => {
+    const m = state.members.find(x => x.email === b.dataset.email); if (!m) return;
+    const off = b.dataset.access === 'off';
+    if (!!m.disabled === off) return;
+    if (off && m.email === state.user.email) return toast('You cannot disable yourself.');
+    if (off && m.role === 'owner' && !state.members.some(x => x.role === 'owner' && !x.disabled && x.email !== m.email)) return toast('This is the only active Owner. Enable or add another Owner first.');
+    try { await store.saveMember(m.email, { disabled: off }); toast(off ? `${m.name || m.email} is disabled and cannot sign in` : `${m.name || m.email} can sign in again`); }
+    catch (err) { console.error(err); toast('Could not change access. Only owners can do this.'); }
+  });
+  main.querySelectorAll('[data-contact]').forEach(b => b.onclick = () => setFilters({ contact: b.dataset.contact }));
+  const sf = $('#sf', main);
+  if (sf) sf.onsubmit = async e => { e.preventDefault(); try { await store.saveSettings({ projectName: $('#s_name').value.trim(), deadline: $('#s_deadline').value || '2026-12-25', budget: Number($('#s_budget').value) || 0 }); toast('Settings saved'); } catch { toast('Could not save settings'); } };
+}
+
+function removeBlock(m) {
+  const email = m.email;
+  if (m.role === 'owner' && !state.members.some(x => x.role === 'owner' && x.email !== email)) return 'This is the only Owner. Make someone else an Owner first, then remove this person.';
+  if (email === state.user.email && store.mode === 'demo') return 'In the demo you are signed in as this person, so it cannot be removed. In the live app it can.';
+  return '';
+}
+async function confirmRemove(m, btn, say, done) {
+  const email = m.email;
+  const block = removeBlock(m); if (block) return say(block);
+  if (btn.dataset.sure !== '1') {
+    btn.dataset.sure = '1'; btn.textContent = 'Yes, remove';
+    say(email === state.user.email ? 'You will lose access to the app. Tap "Yes, remove" to confirm.' : `${m.name || email} will be removed permanently and can no longer sign in. Their items stay, with no point of contact. Tap "Yes, remove" to confirm.`);
+    return;
+  }
+  try {
+    for (const it of state.items.filter(i => i.contact === email)) await store.saveItem(it.id, { contact: '' });
+    await store.deleteMember(email); done && done(); toast(`${m.name || email} removed`);
+    if (email === state.user.email) store.signOut();
+  } catch (err) { console.error(err); say('Could not remove. Only owners can change the team.'); }
+}
+
+function editMember(email) {
+  const m = email ? state.members.find(x => x.email === email) : { email: '', name: '', role: 'contractor', trade: '', phone: '' };
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form method="dialog" id="mf"><div class="dlg-head"><h2>${email ? 'Edit person' : 'Add a person'}</h2><button class="btn" type="button" data-close>← Back</button></div>
+    <div class="dlg-body"><div class="form">
+      <label class="full">Gmail address (used to sign in)<input class="field" type="email" id="m_email" required value="${esc(m.email)}" placeholder="name@gmail.com"></label>${email === state.user.email && store.mode === 'live' ? '<p class="small muted full" style="grid-column:1/-1;margin:0">This is your own sign-in address. If you change it, you will be signed out and must sign in again with the new Gmail.</p>' : ''}
+      <label>Name<input class="field" id="m_name" value="${esc(m.name || '')}" required></label>
+      <label>Phone<input class="field" type="tel" id="m_phone" value="${esc(m.phone || '')}" placeholder="+91 98xxx xxxxx"></label>
+      <label>Role<select class="field" id="m_role">${ROLES.map(r => `<option value="${r.id}" ${r.id === m.role ? 'selected' : ''}>${r.label}</option>`).join('')}</select></label>
+      <label>Trade<select class="field" id="m_trade"><option value=""></option>${TRADES.map(t => `<option ${t === m.trade ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    </div>
+    <div class="row-actions"><button class="btn primary" value="save">Save</button><button class="btn" type="button" data-close>Cancel</button><span class="small muted" id="m_msg"></span></div></div></form>`;
+  dlg.showModal();
+  $('#mf').onsubmit = async e => {
+    if (e.submitter?.value !== 'save') return;
+    e.preventDefault();
+    const em = $('#m_email').value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { $('#m_msg').textContent = 'Enter a valid email address.'; return; }
+    if (em !== email && state.members.some(x => x.email === em)) { $('#m_msg').textContent = 'That address is already on the team.'; return; }
+    try {
+      await store.saveMember(em, { name: $('#m_name').value.trim(), phone: $('#m_phone').value.trim(), role: $('#m_role').value, trade: $('#m_trade').value });
+      if (email && em !== email) {
+        // Gmail changed: move their items to the new address, then remove the old one
+        for (const it of state.items.filter(i => i.contact === email)) await store.saveItem(it.id, { contact: em });
+        const self = email === state.user.email;
+        if (self && store.mode === 'demo') { store.setMe(em); state.user.email = em; }
+        await store.deleteMember(email);
+        if (self && store.mode === 'live') { dlg.close(); toast('Gmail changed. Sign in again with ' + em); return store.signOut(); }
+      }
+      dlg.close(); toast(email ? 'Saved' : `${em} can now sign in`);
+    }
+    catch (err) { console.error(err); $('#m_msg').textContent = 'Could not save. Only owners can change the team.'; }
+  };
+  const del = $('#m_del');
+
+}
+
+/* ---------- item dialog ---------- */
+function logChanges(before, patch) {
+  const labels = { status: 'Status', progress: 'Progress', contact: 'Point of contact', plannedStart: 'Planned start', plannedEnd: 'Planned end', actualDate: 'Actual date', estimate: 'Estimate', actualSpent: 'Actual spent', title: 'Title', daysRequired: 'Days required', aspectId: 'Aspect' };
+  const fmt = (k, v) => k === 'status' ? (ST[v] || ST.planned).label : k === 'progress' ? (v || 0) + '%' : k === 'contact' ? memberName(v) || 'nobody' : k === 'aspectId' ? aspectName(v) : (k === 'estimate' || k === 'actualSpent') ? inr(v) : /Date|planned/i.test(k) ? fmtDateY(v) : v;
+  const parts = Object.keys(labels).filter(k => k in patch && String(patch[k] ?? '') !== String(before[k] ?? '')).map(k => `${labels[k]}: ${fmt(k, before[k]) || 'empty'} → ${fmt(k, patch[k]) || 'empty'}`);
+  if (parts.length && before.id) store.addComment({ itemId: before.id, by: state.user.email, kind: 'change', text: parts.join(' · ') }).catch(() => {});
+}
+
+function openItem(id, defaults = {}) {
+  const isNew = !id;
+  const it = isNew ? { ...blankItem(), ...defaults } : { ...state.items.find(i => i.id === id) };
+  if (!isNew && !it.id) return;
+  const full = can.editAll(), part = can.editProgress();
+  const dis = k => (full || (part && CONTRACTOR_FIELDS.includes(k))) ? '' : 'disabled';
+  const opt = (v, l, cur) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(l)}</option>`;
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form method="dialog" id="itf"><div class="dlg-head"><div><div class="small muted">${esc(isNew ? 'New item' : aspectName(it.aspectId))}</div><h2>${esc(it.title || 'Add an item')}</h2>${!isNew && it.updatedBy ? `<div class="small muted">Last changed by ${esc(memberName(it.updatedBy))}</div>` : ''}</div><button class="btn" type="button" data-close>← Back</button></div>
+  <div class="dlg-body">
+    <div class="form">
+      <label class="full">Details (what needs doing)<input class="field" id="f_title" required value="${esc(it.title)}" ${dis('title')}></label>
+      <label>Aspect<select class="field" id="f_aspectId" ${dis('aspectId')} required>${opt('', 'Choose…', it.aspectId)}${sortedAspects().map(a => opt(a.id, a.name, it.aspectId)).join('')}</select></label>
+      <label>Point of contact<select class="field" id="f_contact" ${dis('contact')}>${opt('', 'Nobody yet', it.contact)}${state.members.filter(m => !m.disabled || m.email === it.contact).map(m => opt(m.email, `${m.name || m.email} (${[...new Set([roleLabel(m.role), m.trade].filter(Boolean))].join(', ')})`, it.contact)).join('')}</select></label>
+      <label>Status<select class="field" id="f_status" ${dis('status')}>${STATUSES.map(s => opt(s.id, s.label, it.status)).join('')}</select></label>
+      <label>Progress <span class="num" id="f_pv">${it.status === 'done' ? 100 : Number(it.progress) || 0}%</span><input type="range" min="0" max="100" step="5" id="f_progress" value="${it.status === 'done' ? 100 : Number(it.progress) || 0}" ${dis('progress')}></label>
+      <label>Trade<select class="field" id="f_trade" ${dis('trade')}>${opt('', '', it.trade)}${TRADES.map(t => opt(t, t, it.trade)).join('')}</select></label>
+      <label>Floor<select class="field" id="f_floor" ${dis('floor')}>${opt('', '', it.floor)}${FLOORS.map(t => opt(t, t, it.floor)).join('')}</select></label>
+      <label class="full">Requirement / next steps<textarea class="field" id="f_nextSteps" ${dis('nextSteps')}>${esc(it.nextSteps)}</textarea></label>
+      <label>Planned start<input class="field" type="date" id="f_plannedStart" value="${esc(it.plannedStart)}" ${dis('plannedStart')}></label>
+      <label>No. of days required<input class="field num" type="number" min="0" id="f_daysRequired" value="${esc(it.daysRequired)}" ${dis('daysRequired')}></label>
+      <label>Planned end<input class="field" type="date" id="f_plannedEnd" value="${esc(it.plannedEnd)}" ${dis('plannedEnd')}></label>
+      <label>Actual completion date<input class="field" type="date" id="f_actualDate" value="${esc(it.actualDate)}" ${dis('actualDate')}></label>
+      <label>Estimate (₹)<input class="field num" type="number" min="0" step="100" id="f_estimate" value="${esc(it.estimate)}" ${dis('estimate')}></label>
+      <label>Actual spent (₹)<input class="field num" type="number" min="0" step="100" id="f_actualSpent" value="${esc(it.actualSpent)}" ${dis('actualSpent')}></label>
+      <label>Priority<select class="field" id="f_priority" ${dis('priority')}>${PRIORITIES.map(p => opt(p, p, it.priority || 'Normal')).join('')}</select></label>
+    </div>
+    <div class="row-actions">${part ? `<button class="btn primary" value="save">${isNew ? 'Add item' : 'Save changes'}</button>` : ''}<button class="btn" type="button" data-close>${isNew ? 'Cancel, don\'t add' : part ? 'Cancel' : 'Close'}</button>${!isNew && can.deleteItem() ? '<button class="btn danger" type="button" id="f_del">Delete item</button>' : ''}<span class="small muted" id="f_msg"></span></div>
+    ${isNew ? '<p class="small muted">Photos and comments can be added after the item is saved.</p>' : `
+    <div><div class="sub-h">Before photos</div><div class="photos" id="ph_before"></div></div>
+    <div><div class="sub-h">After photos</div><div class="photos" id="ph_after"></div></div>
+    <div><div class="sub-h">Comments and history</div>
+      <div class="comment-box"><input class="field" id="c_text" placeholder="Add a comment for the team"><button class="btn" type="button" id="c_add">Post</button></div>
+      <div class="feed" id="feed" style="margin-top:12px"><span class="small muted">Loading…</span></div></div>`}
+  </div></form>`;
+  dlg.showModal();
+  const f = k => $('#f_' + k);
+  f('progress').oninput = () => { f('pv').textContent = f('progress').value + '%'; };
+  f('status').onchange = () => { if (f('status').value === 'done') { f('progress').value = 100; f('pv').textContent = '100%'; if (!f('actualDate').value && !f('actualDate').disabled) f('actualDate').value = todayISO(); } };
+  const autoEnd = () => { const s = f('plannedStart').value, d = Number(f('daysRequired').value); if (s && d > 0 && !f('plannedEnd').disabled) f('plannedEnd').value = isoFromNum(dayNum(s) + d - 1); };
+  f('plannedStart').onchange = autoEnd; f('daysRequired').oninput = autoEnd;
+
+  $('#itf').onsubmit = async e => {
+    if (e.submitter?.value !== 'save') return;
+    e.preventDefault();
+    const keys = full ? ['title', 'aspectId', 'contact', 'status', 'progress', 'trade', 'floor', 'nextSteps', 'plannedStart', 'daysRequired', 'plannedEnd', 'actualDate', 'estimate', 'actualSpent', 'priority'] : CONTRACTOR_FIELDS;
+    const data = {};
+    keys.forEach(k => { let v = f(k).value; if (['progress', 'daysRequired', 'estimate', 'actualSpent'].includes(k)) v = v === '' ? '' : Number(v); data[k] = typeof v === 'string' ? v.trim() : v; });
+    if (full && (!data.title || !data.aspectId)) { $('#f_msg').textContent = 'Fill in the details and choose an aspect.'; return; }
+    if (data.status === 'done') data.progress = 100;
+    if (isNew) data.order = Math.max(0, ...itemsOf(data.aspectId).map(i => i.order || 0)) + 1;
+    // Only send fields that changed (contractors may only touch their fields)
+    const patch = isNew ? { ...blankItem(), ...data } : Object.fromEntries(Object.entries(data).filter(([k, v]) => String(v ?? '') !== String(it[k] ?? '')));
+    if (!isNew && !Object.keys(patch).length) { dlg.close(); return; }
+    try { await store.saveItem(isNew ? null : it.id, patch); if (!isNew) logChanges(it, patch); dlg.close(); toast(isNew ? 'Item added' : 'Saved'); }
+    catch (err) { console.error(err); $('#f_msg').textContent = 'Could not save. You may not have permission to change some of these fields.'; }
+  };
+  const del = $('#f_del');
+  if (del) del.onclick = async () => { if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'Tap again to delete'; return; } await store.deleteItem(it.id); dlg.close(); toast('Item deleted'); };
+  if (!isNew) { loadPhotos(it.id); loadFeed(it.id); wireComment(it.id); }
+}
+
+function wireComment(itemId) {
+  const go = async () => { const t = $('#c_text'); const text = t.value.trim(); if (!text) return; t.value = ''; try { await store.addComment({ itemId, by: state.user.email, kind: 'comment', text }); loadFeed(itemId); } catch { toast('Could not post the comment'); } };
+  $('#c_add').onclick = go;
+  $('#c_text').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
+}
+async function loadFeed(itemId) {
+  const el = $('#feed'); if (!el) return;
+  let cs = []; try { cs = await store.comments(itemId); } catch {}
+  cs.sort((a, b) => b.at - a.at);
+  const when = ms => { const d = new Date(ms); return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`; };
+  el.innerHTML = cs.length ? cs.map(c => `<div class="c ${c.kind === 'change' ? 'change' : ''}"><div class="avatar">${initials(memberName(c.by))}</div><div><b>${esc(memberName(c.by))}</b> <span class="small muted">${when(c.at)}</span><div>${esc(c.text)}</div></div></div>`).join('') : '<span class="small muted">No comments yet.</span>';
+}
+async function loadPhotos(itemId) {
+  let ps = []; try { ps = await store.photos(itemId); } catch {}
+  ['before', 'after'].forEach(kind => {
+    const el = $('#ph_' + kind); if (!el) return;
+    el.innerHTML = ps.filter(p => p.kind === kind).sort((a, b) => a.at - b.at).map(p => `<div class="photo"><img src="${esc(p.data)}" alt="${kind} photo" data-full="${esc(p.id)}">${can.editAll() || p.by === state.user.email ? `<button type="button" data-delphoto="${esc(p.id)}" aria-label="Delete photo">✕</button>` : ''}</div>`).join('') +
+      `<label class="upload">+ Add ${kind} photo<br><span class="small">camera or gallery</span><input type="file" accept="image/*" multiple data-kind="${kind}"></label>`;
+    el.querySelector('input').onchange = async e => {
+      const files = [...e.target.files]; if (!files.length) return;
+      toast('Uploading…');
+      for (const file of files) { try { const data = await shrink(file); await store.addPhoto({ itemId, kind, data, by: state.user.email }); } catch (err) { console.error(err); toast('A photo could not be uploaded'); } }
+      loadPhotos(itemId); toast('Photo added');
+    };
+    el.querySelectorAll('[data-delphoto]').forEach(b => b.onclick = async () => { await store.deletePhoto(b.dataset.delphoto); loadPhotos(itemId); });
+    el.querySelectorAll('img').forEach(img => img.onclick = () => { const w = window.open(); if (w) { w.document.write(`<img src="${img.src}" style="max-width:100%">`); } });
+  });
+}
+function shrink(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onerror = rej;
+    r.onload = () => { const img = new Image(); img.onerror = rej; img.onload = () => {
+      let max = 1280, q = 0.72, out = '';
+      for (let n = 0; n < 6; n++) {
+        const s = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        out = c.toDataURL('image/jpeg', q);
+        if (out.length < 300000) break;
+        max *= 0.8; q = Math.max(0.5, q - 0.06);
+      }
+      res(out);
+    }; img.src = r.result; };
+    r.readAsDataURL(file);
+  });
+}
+
+// Back / Cancel / Close buttons and tapping outside the box always close it (no form checks)
+const dlgEl = $('#dlg');
+dlgEl.addEventListener('click', e => { if (e.target.closest('[data-close]') || e.target === dlgEl) dlgEl.close(); });
+
+boot();
+})();
+</script>
+
+</body>
+</html>
