@@ -137,6 +137,9 @@ button.kpi:hover { border-color: var(--muted); }
 .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .money { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
 .money div b, .money-tile b { display: block; font-family: var(--font-display); font-size: 20px; }
+.dsec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.hide-btn { color: var(--accent); flex: none; }
+.dsec-body[hidden] { display: none; }
 .money-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit; color: inherit; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-width: 0; }
 .money-tile:hover { border-color: var(--accent); }
 .money-tile .go { color: var(--accent); font-weight: 500; }
@@ -678,21 +681,27 @@ function viewDashboard(main) {
       <button class="kpi" data-filter-late><div class="label">Overdue</div><div class="value num" style="color:${late.length ? 'var(--late)' : 'inherit'}">${late.length}</div><div class="sub">past planned end</div></button>
     </div>
     <div class="grid2">
-      <section class="panel"><h2>Overdue</h2><div class="list">${late.length ? late.slice(0, 8).map(row).join('') : '<div class="empty">Nothing overdue.</div>'}</div>
-        <h2 style="margin-top:22px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Due in the next <select id="dueDays" class="field" aria-label="Number of days" style="width:auto;padding:2px 6px;font:inherit">${DUE_OPTS.map(n => `<option value="${n}" ${n === dueDays ? 'selected' : ''}>${n}</option>`).join('')}</select> ${dueDays === 1 ? 'day' : 'days'}</h2><div class="list">${soon.length ? soon.slice(0, 8).map(row).join('') : `<div class="empty">Nothing due in the next ${dueDays === 1 ? 'day' : dueDays + ' days'}.${undated ? ` ${undated} open items have no planned end date yet.` : ''}</div>`}</div>
+      <section class="panel">${secHead('overdue', '<h2>Overdue</h2>')}<div class="dsec-body" ${secHidden('overdue')}><div class="list">${late.length ? late.slice(0, 8).map(row).join('') : '<div class="empty">Nothing overdue.</div>'}</div></div>
+        <div class="dsec-head" style="margin-top:22px"><h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0">Due in the next <select id="dueDays" class="field" aria-label="Number of days" style="width:auto;padding:2px 6px;font:inherit">${DUE_OPTS.map(n => `<option value="${n}" ${n === dueDays ? 'selected' : ''}>${n}</option>`).join('')}</select> ${dueDays === 1 ? 'day' : 'days'}</h2>${hideBtn('due')}</div><div class="dsec-body" ${secHidden('due')}><div class="list">${soon.length ? soon.slice(0, 8).map(row).join('') : `<div class="empty">Nothing due in the next ${dueDays === 1 ? 'day' : dueDays + ' days'}.${undated ? ` ${undated} open items have no planned end date yet.` : ''}</div>`}</div></div>
       </section>
-      <section class="panel"><h2>Money</h2>
+      <section class="panel">${secHead('money', '<h2>Money</h2>')}<div class="dsec-body" ${secHidden('money')}>
         <div class="money"><button type="button" class="money-tile" data-money="estimate"><span class="small muted">Estimated</span><b class="num">${inrShort(est)}</b><span class="go small">See items ›</span></button><button type="button" class="money-tile" data-money="spent"><span class="small muted">Spent so far</span><b class="num">${inrShort(spent)}</b><span class="go small">See items ›</span></button><button type="button" class="money-tile" data-money="budget"><span class="small muted">${budget ? (spent > budget ? 'Over budget' : 'Budget left') : 'Budget'}</span><b class="num" style="${budget && spent > budget ? 'color:var(--late)' : ''}">${budget ? inrShort(Math.abs(budget - spent)) : '<span class="small muted">Not set</span>'}</b><span class="go small">${budget ? 'See breakdown ›' : can.members() ? 'Set budget ›' : 'See breakdown ›'}</span></button></div>
         ${budget ? `<div class="bar"><i style="width:${Math.min(100, spent / budget * 100)}%;background:${spent > budget ? 'var(--late)' : 'var(--accent)'}"></i></div><p class="small muted">${Math.round(spent / budget * 100)}% of ${inr(budget)} budget spent</p>` : `<p class="small muted">${can.editAll() ? 'The Owner can set an overall budget on the Team page.' : ''}</p>`}
-        <h2 style="margin-top:22px">Progress by aspect</h2>
+        </div>${secHead('progress', '<h2>Progress by aspect</h2>', 'margin-top:22px')}<div class="dsec-body" ${secHidden('progress')}>
         <div class="legend">${STATUSES.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}</div>
         <div>${sortedAspects().map(a => { const its = itemsOf(a.id); const n = its.length || 1; return `<div class="aspect-prog" data-filter-aspect="${esc(a.id)}"><span>${esc(a.name)}</span><div class="stack">${STATUSES.map(s => { const c = its.filter(i => (i.status || 'planned') === s.id).length; return c ? `<i style="width:${c / n * 100}%;background:${s.color}" title="${s.label}: ${c}"></i>` : ''; }).join('')}</div><span class="small muted num">${its.filter(i => i.status === 'done').length}/${its.length}</span></div>`; }).join('')}</div>
+        </div>
       </section>
     </div>`;
   wireCommon(main);
   main.querySelectorAll('[data-filter-status]').forEach(b => b.onclick = () => setFilters({ status: b.dataset.filterStatus }));
   main.querySelector('[data-filter-late]').onclick = () => setFilters({ late: true });
   $('#dueDays', main).onchange = e => { lsSet('reno-due-days', Number(e.target.value)); render(); };
+  main.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
+    const h = hiddenSecs(), id = b.dataset.hide; h[id] = !h[id]; lsSet('reno-hidden-secs', h);
+    const body = b.closest('.dsec-head').nextElementSibling; body.hidden = !!h[id];
+    b.textContent = h[id] ? 'Show' : 'Hide'; b.setAttribute('aria-expanded', String(!h[id]));
+  });
   main.querySelectorAll('[data-money]').forEach(b => b.onclick = () => moneyDialog(b.dataset.money));
   main.querySelectorAll('[data-filter-aspect]').forEach(b => b.onclick = () => setFilters({ aspect: b.dataset.filterAspect }));
 }
@@ -1089,6 +1098,12 @@ async function loadPhotos(itemId) {
     el.querySelectorAll('img').forEach(img => img.onclick = () => { const w = window.open(); if (w) { w.document.write(`<img src="${img.src}" style="max-width:100%">`); } });
   });
 }
+/* ---------- dashboard hide/show ---------- */
+const hiddenSecs = () => lsGet('reno-hidden-secs') || {};
+const secHidden = id => hiddenSecs()[id] ? 'hidden' : '';
+const hideBtn = id => `<button type="button" class="btn sm ghost hide-btn" data-hide="${id}" aria-expanded="${!hiddenSecs()[id]}">${hiddenSecs()[id] ? 'Show' : 'Hide'}</button>`;
+const secHead = (id, title, style = '') => `<div class="dsec-head" style="${style}">${title.replace('<h2>', '<h2 style="margin:0">')}${hideBtn(id)}</div>`;
+
 /* ---------- money details ---------- */
 function moneyDialog(kind) {
   const items = state.items;
