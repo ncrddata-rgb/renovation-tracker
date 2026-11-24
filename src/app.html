@@ -317,7 +317,9 @@ const initials = s => (s || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).ma
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
-const APP_URL = (window.RENO_CONFIG && window.RENO_CONFIG.appUrl) || 'https://our-house-renovation.web.app/';
+const APP_URL = 'https://our-house-renovation.web.app';
+// The address people are sent, whichever address the app was opened from
+const SHARE_LINK = 'https://our-house-renovation.web.app';
 function inviteText(email) {
   return `Hi, please use our house renovation tracker: ${APP_URL}\n1. Open the link.\n2. Tap Sign in with Google.\n3. Choose ${email ? 'this Gmail address: ' + email : 'the Gmail address I added for you'}.`;
 }
@@ -335,8 +337,8 @@ function shareInvite(email) {
   dlg.showModal();
   dlg.querySelectorAll('.inv-grid a').forEach(a => a.addEventListener('click', () => setTimeout(() => dlg.close(), 300)));
   $('#inv_copy').onclick = async () => {
-    try { await navigator.clipboard.writeText(text); $('#inv_msg').textContent = 'Link and invite message copied. Paste it anywhere.'; }
-    catch { $('#inv_msg').textContent = 'Copy this link: ' + APP_URL; }
+    try { await navigator.clipboard.writeText(SHARE_LINK); $('#inv_msg').textContent = 'Link copied: ' + SHARE_LINK; }
+    catch { $('#inv_msg').textContent = 'Copy this link: ' + SHARE_LINK; }
   };
 }
 const ICON = {
@@ -415,8 +417,8 @@ function renderShare() {
     confirmRemove(m, b, say, () => renderShare());
   });
   $('#sh_copy').onclick = async () => {
-    try { await navigator.clipboard.writeText(inviteText()); say('Link and invite message copied.'); }
-    catch { say('Copy this link: ' + APP_URL); }
+    try { await navigator.clipboard.writeText(SHARE_LINK); say('Link copied: ' + SHARE_LINK); }
+    catch { say('Copy this link: ' + SHARE_LINK); }
   };
 }
 function shareFallback(text) {
