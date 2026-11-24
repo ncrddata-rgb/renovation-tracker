@@ -136,7 +136,13 @@ button.kpi:hover { border-color: var(--muted); }
 .legend span { display: inline-flex; gap: 6px; align-items: center; }
 .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .money { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
-.money div b { display: block; font-family: var(--font-display); font-size: 20px; }
+.money div b, .money-tile b { display: block; font-family: var(--font-display); font-size: 20px; }
+.money-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit; color: inherit; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-width: 0; }
+.money-tile:hover { border-color: var(--accent); }
+.money-tile .go { color: var(--accent); font-weight: 500; }
+.money-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.money-sum > div { background: var(--sunken); border-radius: 10px; padding: 10px 12px; }
+.money-sum b { display: block; font-family: var(--font-display); font-size: 20px; }
 
 /* filters + items */
 .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
@@ -652,7 +658,6 @@ function viewDashboard(main) {
   const in7 = isoFromNum(dayNum(today) + 7);
   const soon = items.filter(i => i.status !== 'done' && i.plannedEnd && i.plannedEnd >= today && i.plannedEnd <= in7).sort((a, b) => a.plannedEnd.localeCompare(b.plannedEnd));
   const est = items.reduce((s, i) => s + (Number(i.estimate) || 0), 0);
-  const moneyItems = items.filter(i => Number(i.estimate) || Number(i.actualSpent)).sort((a, b) => (Number(b.estimate) || 0) - (Number(a.estimate) || 0));
   const spent = items.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0);
   const budget = Number(state.settings.budget) || 0;
   const undated = items.filter(i => i.status !== 'done' && !i.plannedEnd).length;
@@ -675,9 +680,8 @@ function viewDashboard(main) {
         <h2 style="margin-top:22px">Due in the next 7 days</h2><div class="list">${soon.length ? soon.slice(0, 8).map(row).join('') : `<div class="empty">Nothing due this week.${undated ? ` ${undated} open items have no planned end date yet.` : ''}</div>`}</div>
       </section>
       <section class="panel"><h2>Money</h2>
-        <div class="money"><div><span class="small muted">Estimated</span><b class="num">${inrShort(est)}</b></div><div><span class="small muted">Spent so far</span><b class="num">${inrShort(spent)}</b></div><div><span class="small muted">${budget ? 'Budget left' : 'Budget'}</span><b class="num">${budget ? inrShort(budget - spent) : '<span class="small muted">Not set</span>'}</b></div></div>
+        <div class="money"><button type="button" class="money-tile" data-money="estimate"><span class="small muted">Estimated</span><b class="num">${inrShort(est)}</b><span class="go small">See items ›</span></button><button type="button" class="money-tile" data-money="spent"><span class="small muted">Spent so far</span><b class="num">${inrShort(spent)}</b><span class="go small">See items ›</span></button><button type="button" class="money-tile" data-money="budget"><span class="small muted">${budget ? (spent > budget ? 'Over budget' : 'Budget left') : 'Budget'}</span><b class="num" style="${budget && spent > budget ? 'color:var(--late)' : ''}">${budget ? inrShort(Math.abs(budget - spent)) : '<span class="small muted">Not set</span>'}</b><span class="go small">${budget ? 'See breakdown ›' : can.members() ? 'Set budget ›' : 'See breakdown ›'}</span></button></div>
         ${budget ? `<div class="bar"><i style="width:${Math.min(100, spent / budget * 100)}%;background:${spent > budget ? 'var(--late)' : 'var(--accent)'}"></i></div><p class="small muted">${Math.round(spent / budget * 100)}% of ${inr(budget)} budget spent</p>` : `<p class="small muted">${can.editAll() ? 'The Owner can set an overall budget on the Team page.' : ''}</p>`}
-        ${moneyItems.length ? `<details class="money-src"><summary class="small">Where these amounts come from (${moneyItems.length} item${moneyItems.length === 1 ? '' : 's'})</summary><div class="list">${moneyItems.map(i => `<div class="list-row" data-open="${esc(i.id)}"><div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.updatedBy ? ' · last changed by ' + esc(memberName(i.updatedBy)) : ''}</span></div><span class="small num">${i.estimate ? 'Est. ' + inr(i.estimate) : ''}${i.estimate && i.actualSpent ? '<br>' : ''}${i.actualSpent ? 'Spent ' + inr(i.actualSpent) : ''}</span></div>`).join('')}</div></details>` : '<p class="small muted">No amounts entered yet. Add an Estimate or Actual spent on any item.</p>'}
         <h2 style="margin-top:22px">Progress by aspect</h2>
         <div class="legend">${STATUSES.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}</div>
         <div>${sortedAspects().map(a => { const its = itemsOf(a.id); const n = its.length || 1; return `<div class="aspect-prog" data-filter-aspect="${esc(a.id)}"><span>${esc(a.name)}</span><div class="stack">${STATUSES.map(s => { const c = its.filter(i => (i.status || 'planned') === s.id).length; return c ? `<i style="width:${c / n * 100}%;background:${s.color}" title="${s.label}: ${c}"></i>` : ''; }).join('')}</div><span class="small muted num">${its.filter(i => i.status === 'done').length}/${its.length}</span></div>`; }).join('')}</div>
@@ -686,6 +690,7 @@ function viewDashboard(main) {
   wireCommon(main);
   main.querySelectorAll('[data-filter-status]').forEach(b => b.onclick = () => setFilters({ status: b.dataset.filterStatus }));
   main.querySelector('[data-filter-late]').onclick = () => setFilters({ late: true });
+  main.querySelectorAll('[data-money]').forEach(b => b.onclick = () => moneyDialog(b.dataset.money));
   main.querySelectorAll('[data-filter-aspect]').forEach(b => b.onclick = () => setFilters({ aspect: b.dataset.filterAspect }));
 }
 
@@ -1081,6 +1086,43 @@ async function loadPhotos(itemId) {
     el.querySelectorAll('img').forEach(img => img.onclick = () => { const w = window.open(); if (w) { w.document.write(`<img src="${img.src}" style="max-width:100%">`); } });
   });
 }
+/* ---------- money details ---------- */
+function moneyDialog(kind) {
+  const items = state.items;
+  const est = items.reduce((s, i) => s + (Number(i.estimate) || 0), 0);
+  const spent = items.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0);
+  const budget = Number(state.settings.budget) || 0;
+  const key = kind === 'spent' ? 'actualSpent' : 'estimate';
+  const title = { estimate: 'Estimated cost', spent: 'Spent so far', budget: 'Budget' }[kind];
+  const rowsFor = k => items.filter(i => Number(i[k])).sort((a, b) => Number(b[k]) - Number(a[k]));
+  const itemRow = i => `<div class="list-row" data-money-open="${esc(i.id)}"><div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.updatedBy ? ' · last changed by ' + esc(memberName(i.updatedBy)) : ''}</span></div><span class="small num" style="text-align:right">${i.estimate ? 'Est. ' + inr(i.estimate) : ''}${i.estimate && i.actualSpent ? '<br>' : ''}${i.actualSpent ? 'Spent ' + inr(i.actualSpent) : ''}</span></div>`;
+  let body;
+  if (kind === 'budget') {
+    const byAspect = sortedAspects().map(a => { const its = items.filter(i => i.aspectId === a.id); return { a, e: its.reduce((s, i) => s + (Number(i.estimate) || 0), 0), sp: its.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0) }; }).filter(x => x.e || x.sp);
+    body = `<div class="money-sum"><div><span class="small muted">Overall budget</span><b class="num">${budget ? inr(budget) : 'Not set'}</b></div><div><span class="small muted">Spent so far</span><b class="num">${inr(spent)}</b></div>
+        <div><span class="small muted">${budget && spent > budget ? 'Over budget' : 'Budget left'}</span><b class="num" style="${budget && spent > budget ? 'color:var(--late)' : ''}">${budget ? inr(Math.abs(budget - spent)) : '–'}</b></div><div><span class="small muted">Estimated total</span><b class="num">${inr(est)}</b></div></div>
+      ${budget ? `<div class="bar"><i style="width:${Math.min(100, spent / budget * 100)}%;background:${spent > budget ? 'var(--late)' : 'var(--accent)'}"></i></div><p class="small muted">${Math.round(spent / budget * 100)}% of the budget spent.${est > budget ? ` The estimates add up to ${inr(est - budget)} more than the budget.` : ''}</p>` : ''}
+      ${can.members() ? `<div id="bf" class="row-actions" style="margin:16px 0;align-items:flex-end"><label style="display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500">Overall budget (₹)<input class="field num" type="number" min="0" step="1000" id="b_amt" value="${budget || ''}" placeholder="e.g. 1500000"></label><button class="btn primary" type="button" id="b_save">Save budget</button><span class="small muted" id="b_msg"></span></div>` : '<p class="small muted">Only the Owner can change the budget.</p>'}
+      <div class="sub-h" style="margin-top:12px">By aspect</div>
+      ${byAspect.length ? `<div class="tbl-wrap"><table><thead><tr><th>Aspect</th><th class="num">Estimated</th><th class="num">Spent</th></tr></thead><tbody>${byAspect.map(x => `<tr><td>${esc(x.a.name)}</td><td class="num">${inr(x.e)}</td><td class="num">${inr(x.sp)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">No amounts entered on any item yet.</p>'}`;
+  } else {
+    const rs = rowsFor(key), total = kind === 'spent' ? spent : est;
+    body = `<p class="small muted" style="margin-top:0">${rs.length ? `${rs.length} item${rs.length === 1 ? '' : 's'} add up to <b>${inr(total)}</b>. Tap an item to correct or clear its amount.` : `No item has ${kind === 'spent' ? 'an Actual spent' : 'an Estimate'} amount yet. Open any item to add one.`}</p>
+      <div class="list">${rs.map(itemRow).join('')}</div>`;
+  }
+  const dlg = $('#dlg');
+  dlg.innerHTML = `<form method="dialog"><div class="dlg-head"><h2>${title}</h2><button class="btn" type="button" data-close>← Back</button></div><div class="dlg-body">${body}</div></form>`;
+  dlg.showModal();
+  dlg.querySelectorAll('[data-money-open]').forEach(r => r.onclick = () => openItem(r.dataset.moneyOpen));
+  const bsave = $('#b_save');
+  if (bsave) $('#b_amt').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); bsave.click(); } };
+  if (bsave) bsave.onclick = async () => {
+    const v = Number($('#b_amt').value) || 0;
+    try { await store.saveSettings({ budget: v }); toast(v ? 'Budget saved' : 'Budget cleared'); moneyDialog('budget'); if (currentView() === 'dashboard') render(); }
+    catch (err) { console.error(err); $('#b_msg').textContent = 'Could not save. Only owners can change the budget.'; }
+  };
+}
+
 /* ---------- photos page ---------- */
 const photoFilters = Object.assign({ aspect: '', floor: '', kind: '' }, lsGet('reno-photo-filters') || {});
 let photoCache = null;
