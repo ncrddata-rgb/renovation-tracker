@@ -137,8 +137,12 @@ button.kpi:hover { border-color: var(--muted); }
 .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .money { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
 .money div b, .money-tile b { display: block; font-family: var(--font-display); font-size: 20px; }
-.dsec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.hide-btn { color: var(--accent); flex: none; }
+.dsec-head, .group-head { --head-tint: var(--sunken); --head-tint: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.dsec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; padding: 7px 8px 7px 12px; background: var(--head-tint); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; min-height: 40px; }
+.dsec-head h2, .group-head h2 { font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--fg); margin: 0; }
+.dsec-head h2 select { font-size: 14px; font-weight: 600; }
+.hide-btn { color: var(--accent); flex: none; font-weight: 500; }
+.panel > .dsec-head:first-child { margin-top: 0; }
 .dsec-body[hidden] { display: none; }
 .money-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit; color: inherit; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-width: 0; }
 .money-tile:hover { border-color: var(--accent); }
@@ -154,9 +158,9 @@ button.kpi:hover { border-color: var(--muted); }
 .filters select { max-width: 100%; }
 .chk { display: inline-flex; gap: 6px; align-items: center; }
 .group { margin-bottom: 20px; }
-.group-head { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--fg); }
-.group-head h2 { font-size: 16px; }
+.group-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--head-tint); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; }
 .group-head .bar { flex: 0 0 90px; }
+@media (max-width: 560px) { .group-head { flex-wrap: wrap; row-gap: 4px; } .group-head h2 { flex: 1 0 100%; } }
 .item-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 150px 130px 90px; gap: 12px; align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--line); }
 .item-row:hover { background: var(--sunken); }
 .item-row .title { cursor: pointer; min-width: 0; }
