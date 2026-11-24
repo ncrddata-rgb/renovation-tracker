@@ -278,7 +278,7 @@ dialog::backdrop { background: rgba(10,15,12,.45); }
 const CFG = window.RENO_CONFIG || { firebase: {} };
 const LIVE = !!(CFG.firebase && CFG.firebase.apiKey);
 const STATUSES = [
-  { id: 'planned', label: 'Planned', cls: 's-planned', color: 'var(--planned)' },
+  { id: 'planned', label: 'Not Started', cls: 's-planned', color: 'var(--planned)' },
   { id: 'progress', label: 'In progress', cls: 's-progress', color: 'var(--progress)' },
   { id: 'hold', label: 'On hold', cls: 's-hold', color: 'var(--hold)' },
   { id: 'done', label: 'Done', cls: 's-done', color: 'var(--done)' }
