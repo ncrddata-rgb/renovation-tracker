@@ -322,7 +322,7 @@ const initials = s => (s || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).ma
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
-const APP_URL = (window.RENO_CONFIG && window.RENO_CONFIG.appUrl) || 'https://ncrddata-rgb.github.io/renovation-tracker/';
+const APP_URL = (window.RENO_CONFIG && window.RENO_CONFIG.appUrl) || 'https://our-house-renovation.web.app/';
 function inviteText(email) {
   return `Hi, please use our house renovation tracker: ${APP_URL}\n1. Open the link.\n2. Tap Sign in with Google.\n3. Choose ${email ? 'this Gmail address: ' + email : 'the Gmail address I added for you'}.`;
 }
