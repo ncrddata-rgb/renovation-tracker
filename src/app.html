@@ -222,6 +222,21 @@ dialog::backdrop { background: rgba(10,15,12,.45); }
 .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
 .photo { position: relative; aspect-ratio: 1; max-width: 100%; border-radius: 8px; overflow: hidden; background: var(--sunken); }
 .photo img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+.ph-aspect { margin-top: 28px; }
+.ph-aspect .group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.ph-aspect h2 { margin: 0; }
+.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.ph-card { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); padding: 0; text-align: left; color: inherit; font: inherit; cursor: zoom-in; display: flex; flex-direction: column; }
+.ph-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: var(--sunken); }
+.ph-card .cap { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.ph-card .cap b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-kind { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; }
+.ph-kind.before { background: var(--late-soft); color: var(--late); }
+.ph-kind.after { background: var(--done-soft); color: var(--done); }
+.ph-upload { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px; align-items: end; }
+.ph-upload > label:not(.btn) { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; font-weight: 500; }
+.ph-upload .field { width: 100%; min-width: 0; }
+.ph-big { display: block; max-width: 100%; max-height: 70dvh; margin: 0 auto; border-radius: 8px; }
 .photo button { position: absolute; top: 4px; right: 4px; padding: 0 6px; border-radius: 6px; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; }
 .upload { display: grid; place-items: center; aspect-ratio: 1; border: 1.5px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: 12.5px; text-align: center; cursor: pointer; padding: 6px; }
 .upload input { display: none; }
@@ -452,6 +467,7 @@ function DemoStore() {
     async comments(itemId) { return db.comments.filter(c => c.itemId === itemId); },
     async addComment(c) { db.comments.push({ id: uid(), ...c, at: Date.now() }); if (!lsSet(KEY, db)) {} },
     async photos(itemId) { return db.photos.filter(p => p.itemId === itemId); },
+    async allPhotos() { return [...db.photos]; },
     async addPhoto(p) { db.photos.push({ id: uid(), ...p, at: Date.now() }); if (!lsSet(KEY, db)) toast('Photo kept for this visit only: browser storage is full'); },
     async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); },
     async seed() {},
@@ -521,6 +537,10 @@ async function FirebaseStore() {
       const s = await fs.getDocs(fs.query(col('photos'), fs.where('itemId', '==', itemId)));
       return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
     },
+    async allPhotos() {
+      const s = await fs.getDocs(col('photos'));
+      return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
+    },
     async addPhoto(p) { await fs.addDoc(col('photos'), { ...p, at: fs.serverTimestamp() }); },
     async deletePhoto(id) { await fs.deleteDoc(fs.doc(db, 'photos', id)); },
     async seed(S) {
@@ -579,7 +599,7 @@ function renderGate(kind, msg) {
 /* ---------- shell ---------- */
 const VIEWS = [
   { id: 'dashboard', label: 'Dashboard' }, { id: 'items', label: 'Items' }, { id: 'board', label: 'Board' },
-  { id: 'timeline', label: 'Timeline' }, { id: 'aspects', label: 'Aspects' }, { id: 'team', label: 'Team' }
+  { id: 'timeline', label: 'Timeline' }, { id: 'photos', label: 'Photos' }, { id: 'aspects', label: 'Aspects' }, { id: 'team', label: 'Team' }
 ];
 const currentView = () => { const h = location.hash.slice(1); return VIEWS.some(v => v.id === h) ? h : 'dashboard'; };
 window.addEventListener('hashchange', () => { if (state.ready) render(); window.scrollTo(0, 0); });
@@ -603,7 +623,7 @@ function render() {
   $('#shareApp')?.addEventListener('click', () => openShare());
   if ($('#share')?.open) renderShare();
   const main = $('#main');
-  ({ dashboard: viewDashboard, items: viewItems, board: viewBoard, timeline: viewTimeline, aspects: viewAspects, team: viewTeam })[v](main);
+  ({ dashboard: viewDashboard, items: viewItems, board: viewBoard, timeline: viewTimeline, aspects: viewAspects, team: viewTeam, photos: viewPhotos })[v](main);
 }
 
 function sortedAspects() { return [...state.aspects].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name)); }
@@ -1049,6 +1069,78 @@ async function loadPhotos(itemId) {
     el.querySelectorAll('[data-delphoto]').forEach(b => b.onclick = async () => { await store.deletePhoto(b.dataset.delphoto); loadPhotos(itemId); });
     el.querySelectorAll('img').forEach(img => img.onclick = () => { const w = window.open(); if (w) { w.document.write(`<img src="${img.src}" style="max-width:100%">`); } });
   });
+}
+/* ---------- photos page ---------- */
+const photoFilters = Object.assign({ aspect: '', floor: '', kind: '' }, lsGet('reno-photo-filters') || {});
+let photoCache = null;
+const phWhen = ms => { const d = new Date(ms); return isNaN(d) ? '' : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
+function photoFloor(p) { const it = state.items.find(i => i.id === p.itemId); const a = it && state.aspects.find(x => x.id === it.aspectId); return (it && it.floor) || (a && a.floor) || ''; }
+async function viewPhotos(main) {
+  const asps = sortedAspects();
+  const opt = (v, l, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
+  const f = photoFilters;
+  main.innerHTML = `<div class="section-head"><div><h1>Photos</h1><p>Every photo from the site, grouped by renovation aspect. Tap a photo to see it large.</p></div>
+    <button class="btn primary" id="phAddBtn">+ Upload photo</button></div>
+    <section class="panel" id="phAdd" hidden style="margin-bottom:20px"><h2 style="margin-top:0">Upload a photo</h2><div class="ph-upload">
+      <label>Aspect<select class="field" id="pu_aspect"><option value="">Choose…</option>${asps.map(a => opt(a.id, a.name, '')).join('')}</select></label>
+      <label>Item<select class="field" id="pu_item" disabled><option value="">Choose an aspect first</option></select></label>
+      <label>Before or after<select class="field" id="pu_kind">${opt('before', 'Before', '')}${opt('after', 'After', '')}</select></label>
+      <label class="btn" style="justify-content:center;cursor:pointer">Choose photos<input type="file" accept="image/*" multiple id="pu_file" hidden></label>
+    </div><p class="small muted" id="pu_msg" style="margin:10px 0 0"></p></section>
+    <div class="filters"><select id="pf_aspect" aria-label="Aspect">${opt('', 'All aspects', f.aspect)}${asps.map(a => opt(a.id, a.name, f.aspect)).join('')}</select>
+      <select id="pf_floor" aria-label="Floor">${opt('', 'All floors', f.floor)}${FLOORS.map(x => opt(x, x, f.floor)).join('')}</select>
+      <select id="pf_kind" aria-label="Before or after">${opt('', 'Before and after', f.kind)}${opt('before', 'Before only', f.kind)}${opt('after', 'After only', f.kind)}</select></div>
+    <div id="phList"><p class="muted" style="margin-top:24px">Loading photos…</p></div>`;
+  const list = $('#phList', main);
+  const draw = () => {
+    if (!photoCache) return;
+    const items = new Map(state.items.map(i => [i.id, i]));
+    const ps = photoCache.filter(p => items.has(p.itemId) && (!f.kind || p.kind === f.kind) && (!f.floor || photoFloor(p) === f.floor) && (!f.aspect || items.get(p.itemId).aspectId === f.aspect));
+    const groups = asps.map(a => ({ a, ps: ps.filter(p => items.get(p.itemId).aspectId === a.id).sort((x, y) => (items.get(x.itemId).title || '').localeCompare(items.get(y.itemId).title || '') || (x.kind === y.kind ? 0 : x.kind === 'before' ? -1 : 1) || x.at - y.at) })).filter(g => g.ps.length);
+    list.innerHTML = groups.length ? groups.map(({ a, ps }) => `<section class="ph-aspect"><div class="group-head"><h2>${esc(a.name)}</h2><span class="small muted">${a.floor ? esc(a.floor) + ' · ' : ''}${ps.length} photo${ps.length === 1 ? '' : 's'} · ${ps.filter(p => p.kind === 'before').length} before, ${ps.filter(p => p.kind === 'after').length} after</span></div>
+      <div class="ph-grid">${ps.map(p => `<button type="button" class="ph-card" data-ph="${esc(p.id)}"><img src="${esc(p.data)}" alt="${esc(p.kind)} photo of ${esc(items.get(p.itemId).title)}" loading="lazy"><span class="cap"><span class="ph-kind ${p.kind === 'after' ? 'after' : 'before'}">${p.kind === 'after' ? 'After' : 'Before'}</span><b>${esc(items.get(p.itemId).title)}</b><span class="small muted">${esc(memberName(p.by))} · ${phWhen(p.at)}</span></span></button>`).join('')}</div></section>`).join('')
+      : `<p class="muted" style="margin-top:24px">${photoCache.length ? 'No photos match these filters.' : 'No photos yet. Tap "+ Upload photo" to add the first one.'}</p>`;
+    list.querySelectorAll('[data-ph]').forEach(b => b.onclick = () => showPhoto(photoCache.find(p => p.id === b.dataset.ph), () => draw()));
+  };
+  [['pf_aspect', 'aspect'], ['pf_floor', 'floor'], ['pf_kind', 'kind']].forEach(([id, k]) => $('#' + id, main).onchange = e => { f[k] = e.target.value; lsSet('reno-photo-filters', f); draw(); });
+  $('#phAddBtn', main).onclick = () => { const s = $('#phAdd', main); s.hidden = !s.hidden; if (!s.hidden) $('#pu_aspect', main).focus(); };
+  $('#pu_aspect', main).onchange = e => {
+    const its = state.items.filter(i => i.aspectId === e.target.value).sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.title.localeCompare(b.title));
+    const sel = $('#pu_item', main); sel.disabled = !its.length;
+    sel.innerHTML = its.length ? its.map(i => opt(i.id, i.title, '')).join('') : '<option value="">No items in this aspect</option>';
+  };
+  $('#pu_file', main).onchange = async e => {
+    const files = [...e.target.files]; e.target.value = '';
+    const itemId = $('#pu_item', main).value, kind = $('#pu_kind', main).value, msg = $('#pu_msg', main);
+    if (!itemId) { msg.textContent = 'Choose the aspect and item first.'; return; }
+    if (!files.length) return;
+    let ok = 0; msg.textContent = 'Uploading…';
+    for (const file of files) { try { const data = await shrink(file); await store.addPhoto({ itemId, kind, data, by: state.user.email }); ok++; } catch (err) { console.error(err); } }
+    msg.textContent = ok === files.length ? `${ok} photo${ok === 1 ? '' : 's'} added.` : `${ok} of ${files.length} photos added. The rest could not be uploaded.`;
+    await loadAll(); draw();
+  };
+  const loadAll = async () => { try { photoCache = await store.allPhotos(); } catch (err) { console.error(err); photoCache = []; list.innerHTML = '<p class="muted" style="margin-top:24px">Photos could not be loaded. Check your connection and refresh.</p>'; return; } };
+  if (photoCache) draw();
+  await loadAll(); if (currentView() === 'photos' && document.body.contains(list)) draw();
+}
+function showPhoto(p, after) {
+  if (!p) return;
+  const it = state.items.find(i => i.id === p.itemId) || {};
+  const dlg = $('#dlg');
+  const canDel = can.editAll() || p.by === state.user.email;
+  dlg.innerHTML = `<form method="dialog"><div class="dlg-head"><div><div class="small muted">${esc(aspectName(it.aspectId))}${photoFloor(p) ? ' · ' + esc(photoFloor(p)) : ''}</div><h2>${esc(it.title || 'Photo')}</h2>
+      <div class="small muted"><span class="ph-kind ${p.kind === 'after' ? 'after' : 'before'}">${p.kind === 'after' ? 'After' : 'Before'}</span> ${esc(memberName(p.by))} · ${phWhen(p.at)}</div></div>
+      <button class="btn" type="button" data-close>← Back</button></div>
+    <div class="dlg-body"><img class="ph-big" src="${esc(p.data)}" alt="${esc(p.kind)} photo of ${esc(it.title || '')}">
+      <div class="row-actions"><button class="btn primary" type="button" id="ph_open">Open item</button>${canDel ? '<button class="btn danger" type="button" id="ph_del">Delete photo</button>' : ''}<span class="small muted" id="ph_msg"></span></div></div></form>`;
+  dlg.showModal();
+  $('#ph_open').onclick = () => { dlg.close(); openItem(p.itemId); };
+  const del = $('#ph_del');
+  if (del) del.onclick = async () => {
+    if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'Yes, delete'; $('#ph_msg').textContent = 'This photo will be deleted permanently.'; return; }
+    try { await store.deletePhoto(p.id); photoCache = (photoCache || []).filter(x => x.id !== p.id); dlg.close(); toast('Photo deleted'); after && after(); }
+    catch (err) { console.error(err); $('#ph_msg').textContent = 'Could not delete this photo.'; }
+  };
 }
 function shrink(file) {
   return new Promise((res, rej) => {
