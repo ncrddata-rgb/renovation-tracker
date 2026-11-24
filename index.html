@@ -328,7 +328,7 @@ const APP_URL = 'https://our-house-renovation.web.app';
 // The address people are sent, whichever address the app was opened from
 const SHARE_LINK = 'https://our-house-renovation.web.app';
 function inviteText(email) {
-  return `Hi, please use our house renovation tracker: ${APP_URL}\n1. Open the link.\n2. Tap Sign in with Google.\n3. Choose ${email ? 'this Gmail address: ' + email : 'the Gmail address I added for you'}.`;
+  return `${APP_URL}\n\nHi everyone! 😊\nYou're just a few simple steps away from accessing our House Renovation App. Let's get started!\n\n1. Open the link shared above.\n2. Click on Sign in with Google.\n3. Select the Gmail account I've added for you.\n\nThat's it! You're all set! 🎉`;
 }
 function shareInvite(email) {
   if (!can.members()) return;
@@ -366,7 +366,7 @@ async function sendInviteEmail(email, role) {
   if (!r.ok) throw new Error('EmailJS ' + r.status + ' ' + await r.text());
 }
 const waLink = text => 'https://wa.me/?text=' + encodeURIComponent(text);
-const tgLink = text => 'https://t.me/share/url?url=' + encodeURIComponent(APP_URL) + '&text=' + encodeURIComponent(text.replace(APP_URL, '').replace(/:\s*\n/, ':\n'));
+const tgLink = text => 'https://t.me/share/url?url=' + encodeURIComponent(APP_URL) + '&text=' + encodeURIComponent(text.replace(APP_URL, '').trim());
 const mailLink = (to, text) => `mailto:${to ? encodeURIComponent(to) : ''}?subject=${encodeURIComponent('Our house renovation tracker')}&body=${encodeURIComponent(text)}`;
 function openShare() {
   if (!can.members()) return; renderShare(); const d = $('#share');
