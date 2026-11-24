@@ -244,6 +244,8 @@ dialog::backdrop { background: rgba(10,15,12,.45); }
 .ph-upload > label:not(.btn) { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; font-weight: 500; }
 .ph-upload .field { width: 100%; min-width: 0; }
 .ph-big { display: block; max-width: 100%; max-height: 70dvh; margin: 0 auto; border-radius: 8px; }
+.money-src { margin-top: 10px; }
+.money-src summary { cursor: pointer; color: var(--accent); font-weight: 500; }
 .photo button { position: absolute; top: 4px; right: 4px; padding: 0 6px; border-radius: 6px; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; }
 .upload { display: grid; place-items: center; aspect-ratio: 1; border: 1.5px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: 12.5px; text-align: center; cursor: pointer; padding: 6px; }
 .upload input { display: none; }
@@ -650,6 +652,7 @@ function viewDashboard(main) {
   const in7 = isoFromNum(dayNum(today) + 7);
   const soon = items.filter(i => i.status !== 'done' && i.plannedEnd && i.plannedEnd >= today && i.plannedEnd <= in7).sort((a, b) => a.plannedEnd.localeCompare(b.plannedEnd));
   const est = items.reduce((s, i) => s + (Number(i.estimate) || 0), 0);
+  const moneyItems = items.filter(i => Number(i.estimate) || Number(i.actualSpent)).sort((a, b) => (Number(b.estimate) || 0) - (Number(a.estimate) || 0));
   const spent = items.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0);
   const budget = Number(state.settings.budget) || 0;
   const undated = items.filter(i => i.status !== 'done' && !i.plannedEnd).length;
@@ -674,6 +677,7 @@ function viewDashboard(main) {
       <section class="panel"><h2>Money</h2>
         <div class="money"><div><span class="small muted">Estimated</span><b class="num">${inrShort(est)}</b></div><div><span class="small muted">Spent so far</span><b class="num">${inrShort(spent)}</b></div><div><span class="small muted">${budget ? 'Budget left' : 'Budget'}</span><b class="num">${budget ? inrShort(budget - spent) : '<span class="small muted">Not set</span>'}</b></div></div>
         ${budget ? `<div class="bar"><i style="width:${Math.min(100, spent / budget * 100)}%;background:${spent > budget ? 'var(--late)' : 'var(--accent)'}"></i></div><p class="small muted">${Math.round(spent / budget * 100)}% of ${inr(budget)} budget spent</p>` : `<p class="small muted">${can.editAll() ? 'The Owner can set an overall budget on the Team page.' : ''}</p>`}
+        ${moneyItems.length ? `<details class="money-src"><summary class="small">Where these amounts come from (${moneyItems.length} item${moneyItems.length === 1 ? '' : 's'})</summary><div class="list">${moneyItems.map(i => `<div class="list-row" data-open="${esc(i.id)}"><div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.updatedBy ? ' · last changed by ' + esc(memberName(i.updatedBy)) : ''}</span></div><span class="small num">${i.estimate ? 'Est. ' + inr(i.estimate) : ''}${i.estimate && i.actualSpent ? '<br>' : ''}${i.actualSpent ? 'Spent ' + inr(i.actualSpent) : ''}</span></div>`).join('')}</div></details>` : '<p class="small muted">No amounts entered yet. Add an Estimate or Actual spent on any item.</p>'}
         <h2 style="margin-top:22px">Progress by aspect</h2>
         <div class="legend">${STATUSES.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}</div>
         <div>${sortedAspects().map(a => { const its = itemsOf(a.id); const n = its.length || 1; return `<div class="aspect-prog" data-filter-aspect="${esc(a.id)}"><span>${esc(a.name)}</span><div class="stack">${STATUSES.map(s => { const c = its.filter(i => (i.status || 'planned') === s.id).length; return c ? `<i style="width:${c / n * 100}%;background:${s.color}" title="${s.label}: ${c}"></i>` : ''; }).join('')}</div><span class="small muted num">${its.filter(i => i.status === 'done').length}/${its.length}</span></div>`; }).join('')}</div>
