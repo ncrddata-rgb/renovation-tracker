@@ -360,7 +360,7 @@ async function sendInviteEmail(email, role) {
 }
 const waLink = text => 'https://wa.me/?text=' + encodeURIComponent(text);
 const tgLink = text => 'https://t.me/share/url?url=' + encodeURIComponent(APP_URL) + '&text=' + encodeURIComponent(text.replace(APP_URL, '').trim());
-const mailLink = (to, text) => `mailto:${to ? encodeURIComponent(to) : ''}?subject=${encodeURIComponent('Our house renovation tracker')}&body=${encodeURIComponent(text)}`;
+const mailLink = (to, text) => 'https://mail.google.com/mail/?view=cm&fs=1' + (to ? '&to=' + encodeURIComponent(to) : '') + '&su=' + encodeURIComponent('Our House Renovation App') + '&body=' + encodeURIComponent(text);
 function openShare() {
   if (!can.members()) return; renderShare(); const d = $('#share');
   if (!d.dataset.wired) { d.dataset.wired = '1'; d.addEventListener('click', e => { if (e.target === d) d.close(); }); }
