@@ -1,4 +1,4 @@
-<title>House Renovation Tracker</title>
+<title>House Renovation App</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
@@ -274,7 +274,7 @@ dialog::backdrop { background: rgba(10,15,12,.45); }
 @media (prefers-reduced-motion: no-preference) { .bar > i { transition: width .3s; } }
 </style>
 
-<div id="app"><div class="gate"><div class="box"><h1>House Renovation Tracker</h1><p class="muted">Loading…</p></div></div></div>
+<div id="app"><div class="gate"><div class="box"><h1>House Renovation App</h1><p class="muted">Loading…</p></div></div></div>
 <dialog id="dlg"></dialog>
 <dialog id="share" class="drawer" aria-label="Share"></dialog>
 <div id="toast" class="toast" hidden></div>
@@ -620,7 +620,7 @@ function renderGate(kind, msg) {
   else if (kind === 'disabled') body = `<p>Access for <b>${esc(state.user.email)}</b> has been turned off.</p><p class="muted">Ask the owner to enable it again on the Team page.</p><button class="btn" id="gout">Use a different account</button>`;
   else if (kind === 'error') body = `<p class="muted">${esc(msg)}</p>`;
   else body = '<p class="muted">Loading the project…</p>';
-  app.innerHTML = `<div class="gate"><div class="box"><h1>House Renovation Tracker</h1>${body}</div></div>`;
+  app.innerHTML = `<div class="gate"><div class="box"><h1>House Renovation App</h1>${body}</div></div>`;
   $('#gsign')?.addEventListener('click', async () => {
     try { await store.signIn(); } catch (e) { $('#gerr').textContent = e.code === 'auth/unauthorized-domain' ? 'This web address is not yet allowed in Firebase (Authentication > Settings > Authorized domains).' : 'Sign-in did not complete. Please try again.'; }
   });
