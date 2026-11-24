@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "site": "our-house-renovation",
+    "public": ".",
+    "ignore": ["firebase.json", ".firebaserc", "**/.*", "src/**", "build.sh", "README.md", "firestore.rules"],
+    "headers": [
+      { "source": "**/*.@(html|js)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    ]
+  }
+}
