@@ -686,7 +686,7 @@ function viewDashboard(main) {
 
   main.innerHTML = `
     <div class="section-head"><div><h1>Where the renovation stands</h1><p>${items.length} items across ${state.aspects.length} aspects · today ${fmtDateY(today)}</p></div>
-      <div class="row-actions">${can.editAll() ? '<button class="btn primary" data-add-item>+ Add item</button>' : ''}</div></div>
+</div>
     ${items.length === 0 ? seedPanel() : ''}
     <div class="kpis">
       <div class="kpi countdown"><div class="label">Days to hand-over</div><div class="value num">${daysLeft >= 0 ? daysLeft : 'Over by ' + -daysLeft}</div><div class="sub">${fmtDateY(deadline())}</div></div>
