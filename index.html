@@ -655,7 +655,7 @@ function viewDashboard(main) {
   const daysLeft = dayNum(deadline()) - dayNum(today);
   const counts = Object.fromEntries(STATUSES.map(s => [s.id, items.filter(i => (i.status || 'planned') === s.id).length]));
   const late = items.filter(isLate).sort((a, b) => a.plannedEnd.localeCompare(b.plannedEnd));
-  const dueDays = [7, 8, 9, 10].includes(Number(lsGet('reno-due-days'))) ? Number(lsGet('reno-due-days')) : 7;
+  const dueDays = [7, 8, 9, 10, 11, 12, 13, 14, 15].includes(Number(lsGet('reno-due-days'))) ? Number(lsGet('reno-due-days')) : 7;
   const in7 = isoFromNum(dayNum(today) + dueDays);
   const soon = items.filter(i => i.status !== 'done' && i.plannedEnd && i.plannedEnd >= today && i.plannedEnd <= in7).sort((a, b) => a.plannedEnd.localeCompare(b.plannedEnd));
   const est = items.reduce((s, i) => s + (Number(i.estimate) || 0), 0);
@@ -678,7 +678,7 @@ function viewDashboard(main) {
     </div>
     <div class="grid2">
       <section class="panel"><h2>Overdue</h2><div class="list">${late.length ? late.slice(0, 8).map(row).join('') : '<div class="empty">Nothing overdue.</div>'}</div>
-        <h2 style="margin-top:22px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Due in the next <select id="dueDays" class="field" aria-label="Number of days" style="width:auto;padding:2px 6px;font:inherit">${[7, 8, 9, 10].map(n => `<option value="${n}" ${n === dueDays ? 'selected' : ''}>${n}</option>`).join('')}</select> days</h2><div class="list">${soon.length ? soon.slice(0, 8).map(row).join('') : `<div class="empty">Nothing due in the next ${dueDays} days.${undated ? ` ${undated} open items have no planned end date yet.` : ''}</div>`}</div>
+        <h2 style="margin-top:22px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Due in the next <select id="dueDays" class="field" aria-label="Number of days" style="width:auto;padding:2px 6px;font:inherit">${[7, 8, 9, 10, 11, 12, 13, 14, 15].map(n => `<option value="${n}" ${n === dueDays ? 'selected' : ''}>${n}</option>`).join('')}</select> days</h2><div class="list">${soon.length ? soon.slice(0, 8).map(row).join('') : `<div class="empty">Nothing due in the next ${dueDays} days.${undated ? ` ${undated} open items have no planned end date yet.` : ''}</div>`}</div>
       </section>
       <section class="panel"><h2>Money</h2>
         <div class="money"><button type="button" class="money-tile" data-money="estimate"><span class="small muted">Estimated</span><b class="num">${inrShort(est)}</b><span class="go small">See items ›</span></button><button type="button" class="money-tile" data-money="spent"><span class="small muted">Spent so far</span><b class="num">${inrShort(spent)}</b><span class="go small">See items ›</span></button><button type="button" class="money-tile" data-money="budget"><span class="small muted">${budget ? (spent > budget ? 'Over budget' : 'Budget left') : 'Budget'}</span><b class="num" style="${budget && spent > budget ? 'color:var(--late)' : ''}">${budget ? inrShort(Math.abs(budget - spent)) : '<span class="small muted">Not set</span>'}</b><span class="go small">${budget ? 'See breakdown ›' : can.members() ? 'Set budget ›' : 'See breakdown ›'}</span></button></div>
