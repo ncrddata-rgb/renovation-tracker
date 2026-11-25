@@ -543,6 +543,7 @@ function DemoStore() {
     async resetStatus() {
       db.items.forEach(i => Object.assign(i, { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '' }));
       db.comments = []; db.photos = []; persist(); state.thumbs = {}; thumbsChanged();
+      return db.items.filter(i => i.contact || i.status !== 'planned').length;
     },
     async seed() {},
     async signOut() {},
@@ -659,6 +660,9 @@ async function FirebaseStore() {
       // Thumbnails are optional; ignore if the database rules do not cover them yet
       try { const t = await fs.getDocs(col('thumbs')); for (let k = 0; k < t.docs.length; k += 400) { const b = fs.writeBatch(db); t.docs.slice(k, k + 400).forEach(d => b.delete(d.ref)); await b.commit(); } } catch {}
       state.thumbs = {}; thumbsChanged();
+      // Check the saved data on the server, not this browser's copy
+      const fresh = await (fs.getDocsFromServer || fs.getDocs)(col('items'));
+      return fresh.docs.filter(d => { const x = d.data(); return x.contact || (x.status || 'planned') !== 'planned' || Number(x.progress) || x.plannedStart || x.plannedEnd; }).length;
     },
     async seed(S) {
       const b = fs.writeBatch(db);
@@ -1070,8 +1074,9 @@ function confirmResetStatus() {
       const backup = await store.statusBackup();
       saveBlob(`status-backup-${todayISO()}.json`, new Blob([JSON.stringify({ project: projectName(), savedAt: new Date().toISOString(), by: state.user.email, ...backup })], { type: 'application/json' }));
       msg.textContent = 'Resetting…';
-      await store.resetStatus(backup);
-      dlg.close(); toast('Status data reset. Every item is back to Not Started.');
+      const left = await store.resetStatus(backup);
+      if (left) { msg.textContent = `${left} item${left === 1 ? ' was' : 's were'} not fully reset. Please refresh the page and press Reset again.`; go.disabled = false; word.disabled = false; return; }
+      dlg.close(); toast('Status data reset. Every item is back to Not Started and unassigned.');
     } catch (err) { console.error(err); msg.textContent = 'Could not finish the reset. Check your connection and try again. Only Owners can do this.'; go.disabled = false; word.disabled = false; }
   };
 }
