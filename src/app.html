@@ -290,7 +290,7 @@ const STATUSES = [
   { id: 'planned', label: 'Not Started', cls: 's-planned', color: 'var(--planned)' },
   { id: 'progress', label: 'In progress', cls: 's-progress', color: 'var(--progress)' },
   { id: 'hold', label: 'On hold', cls: 's-hold', color: 'var(--hold)' },
-  { id: 'done', label: 'Done', cls: 's-done', color: 'var(--done)' }
+  { id: 'done', label: 'Completed', cls: 's-done', color: 'var(--done)' }
 ];
 const ST = Object.fromEntries(STATUSES.map(s => [s.id, s]));
 const FLOORS = ['Ground floor', '1st floor', '2nd floor', 'Terrace', 'Outside', 'All floors', 'Multiple', 'General'];
@@ -874,7 +874,7 @@ function viewAspects(main) {
   const asp = sortedAspects();
   main.innerHTML = `<div class="section-head"><div><h1>Renovation aspects</h1><p>The areas of work, such as Kitchen or Lift. Add one whenever something new comes up.</p></div>
     ${can.editAll() ? '<button class="btn primary" id="addAspect">+ Add aspect</button>' : ''}</div>
-    <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Aspect</th><th>Floor</th><th>Items</th><th>Done</th><th>Spent / Estimate</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Aspect</th><th>Floor</th><th>Items</th><th>Completed</th><th>Spent / Estimate</th><th></th></tr></thead><tbody>
     ${asp.map((a, n) => { const its = itemsOf(a.id); const e = its.reduce((s, i) => s + (Number(i.estimate) || 0), 0), sp = its.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0); return `<tr>
       <td class="num muted">${n + 1}</td><td><b>${esc(a.name)}</b>${a.notes ? `<div class="small muted">${esc(a.notes)}</div>` : ''}</td><td>${esc(a.floor || '')}</td><td class="num">${its.length}</td><td class="num">${its.filter(i => i.status === 'done').length}</td><td class="num small">${e || sp ? `${inrShort(sp)} / ${inrShort(e)}` : '<span class="muted">None yet</span>'}</td>
       <td style="white-space:nowrap">${can.editAll() ? `<button class="btn sm ghost" data-up="${n}" aria-label="Move up" ${n === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-down="${n}" aria-label="Move down" ${n === asp.length - 1 ? 'disabled' : ''}>↓</button><button class="btn sm" data-edit-aspect="${esc(a.id)}">Edit</button> <button class="btn sm" data-add-item="${esc(a.id)}">+ Item</button>` : `<button class="btn sm" onclick="location.hash='items'">View</button>`}</td></tr>`; }).join('')}
