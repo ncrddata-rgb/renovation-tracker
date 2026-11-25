@@ -1158,6 +1158,85 @@ const secHidden = id => hiddenSecs()[id] ? 'hidden' : '';
 const hideBtn = id => `<button type="button" class="btn sm ghost hide-btn" data-hide="${id}" aria-expanded="${!hiddenSecs()[id]}">${hiddenSecs()[id] ? 'Show' : 'Hide'}</button>`;
 const secHead = (id, title, style = '') => `<div class="dsec-head" style="${style}">${title.replace('<h2>', '<h2 style="margin:0">')}${hideBtn(id)}</div>`;
 
+/* ---------- report downloads ---------- */
+const loaded = {};
+const loadScript = src => loaded[src] || (loaded[src] = new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { delete loaded[src]; rej(new Error('Could not load ' + src)); }; document.head.appendChild(s); }));
+function saveBlob(filename, blob) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Downloaded ' + filename);
+}
+// The rows behind every section of the report, shared by the PDF and the Excel file
+function reportTables(R, weekly) {
+  const who = e => e ? memberName(e) : 'No contact';
+  const d = ms => { const x = new Date(ms); return fmtDateY(new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 10)); };
+  const per = weekly ? 'this week' : 'today';
+  return [
+    { name: 'Completed', title: `Completed ${per}`, head: ['Item', 'Aspect', 'Responsible', 'Completed by', 'Date'],
+      rows: R.completed.map(c => [c.it.title, aspectName(c.it.aspectId), who(c.it.contact), c.by ? memberName(c.by) : '', d(c.at)]) },
+    { name: 'In progress', title: 'Work in progress', head: ['Item', 'Aspect', 'Responsible', 'Progress %', `Moved ${per}`, 'Due'],
+      rows: R.inProgress.map(i => { const m = R.moved.find(x => x.it.id === i.id); return [i.title, aspectName(i.aspectId), who(i.contact), Number(i.progress) || 0, m ? `+${m.to - m.from}%` : '', fmtDateY(i.plannedEnd)]; }) },
+    { name: 'On hold', title: 'On hold', head: ['Item', 'Aspect', 'Responsible', 'Due', 'Latest note'],
+      rows: R.onHold.map(i => { const n = [...R.notes].reverse().find(c => c.itemId === i.id); return [i.title, aspectName(i.aspectId), who(i.contact), fmtDateY(i.plannedEnd), n ? n.text : '']; }) },
+    { name: 'Overdue', title: 'Challenges and delays (overdue)', head: ['Item', 'Aspect', 'Responsible', 'Was due', 'Days late'],
+      rows: R.overdue.map(i => [i.title, aspectName(i.aspectId), who(i.contact), fmtDateY(i.plannedEnd), dayNum(todayISO()) - dayNum(i.plannedEnd)]) },
+    { name: 'Pending', title: 'Pending (not started)', head: ['Item', 'Aspect', 'Responsible', 'Planned start', 'Due'],
+      rows: R.pending.map(i => [i.title, aspectName(i.aspectId), who(i.contact), fmtDateY(i.plannedStart), fmtDateY(i.plannedEnd)]) },
+    { name: 'Notes', title: `Notes from the team ${per}`, head: ['Item', 'Note', 'By', 'When'],
+      rows: R.notes.map(c => [(state.items.find(i => i.id === c.itemId) || {}).title || '', c.text, memberName(c.by), new Date(c.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })]) },
+    { name: 'People', title: 'Accountability by person', head: ['Person', `Completed ${per}`, 'Updates made', 'In progress', 'On hold', 'Overdue', 'Open items'],
+      rows: R.people.map(p => [p.email ? memberName(p.email) : 'No contact assigned', p.done, p.updates, p.prog, p.hold, p.late, p.open]) }
+  ];
+}
+const reportFileName = (R, weekly, ext) => `${weekly ? 'weekly' : 'daily'}-report-${R.r.from}.${ext}`;
+function reportSummaryRows(R, weekly) {
+  return [['Report', `${weekly ? 'Weekly' : 'Daily'} progress report`], ['Period', R.r.label], ['Project', projectName()], [],
+    [`Completed ${weekly ? 'this week' : 'today'}`, R.completed.length], ['In progress', R.inProgress.length], ['Moved forward', R.moved.length],
+    ['Pending (not started)', R.pending.length], ['On hold', R.onHold.length], ['Overdue', R.overdue.length],
+    ['Overall progress', R.pct + '%'], ['Items completed overall', `${R.doneTotal} of ${R.total}`], [],
+    ['Note', 'In progress, On hold, Pending and Overdue show status on the day the file was made. Completed, progress moved and notes are for the period.'],
+    ['Made on', new Date().toLocaleString('en-IN')]];
+}
+async function downloadReportExcel(R, weekly) {
+  toast('Preparing Excel file…');
+  try {
+    await loadScript('vendor/xlsx.full.min.js');
+    const X = window.XLSX, wb = X.utils.book_new();
+    const sum = X.utils.aoa_to_sheet(reportSummaryRows(R, weekly)); sum['!cols'] = [{ wch: 26 }, { wch: 60 }];
+    X.utils.book_append_sheet(wb, sum, 'Summary');
+    if (weekly) { const ws = X.utils.aoa_to_sheet([['Day', 'Completed'], ...Object.entries(R.perDay).map(([d, v]) => [fmtDateY(d), v])]); ws['!cols'] = [{ wch: 16 }, { wch: 12 }]; X.utils.book_append_sheet(wb, ws, 'Per day'); }
+    reportTables(R, weekly).forEach(t => { const ws = X.utils.aoa_to_sheet([t.head, ...t.rows]); ws['!cols'] = t.head.map((h, k) => ({ wch: k === 0 ? 40 : h === 'Note' || h === 'Latest note' ? 50 : 18 })); X.utils.book_append_sheet(wb, ws, t.name); });
+    const out = X.write(wb, { bookType: 'xlsx', type: 'array' });
+    saveBlob(reportFileName(R, weekly, 'xlsx'), new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  } catch (e) { console.error(e); toast('Could not make the Excel file. Check your connection and try again.'); }
+}
+async function downloadReportPdf(R, weekly) {
+  toast('Preparing PDF…');
+  try {
+    await loadScript('vendor/jspdf.umd.min.js'); await loadScript('vendor/jspdf.plugin.autotable.min.js');
+    const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth(), M = 40, accent = [31, 92, 122];
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(20); doc.text(`${weekly ? 'Weekly' : 'Daily'} Progress Report`, M, 50);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(90); doc.text(`${R.r.label}  ·  ${projectName()}`, M, 68);
+    const tiles = [[`Completed ${weekly ? 'this week' : 'today'}`, R.completed.length], ['In progress', R.inProgress.length], ['Pending', R.pending.length], ['On hold', R.onHold.length], ['Overdue', R.overdue.length], ['Overall', R.pct + '%']];
+    const tw = (W - 2 * M - 5 * 8) / 6;
+    tiles.forEach(([l, v], k) => { const x = M + k * (tw + 8); doc.setDrawColor(220); doc.setFillColor(247, 248, 246); doc.roundedRect(x, 82, tw, 52, 6, 6, 'FD');
+      doc.setFontSize(7.5); doc.setTextColor(110); doc.text(l.toUpperCase(), x + 8, 97, { maxWidth: tw - 12 }); doc.setFontSize(17); doc.setTextColor(20); doc.setFont('helvetica', 'bold'); doc.text(String(v), x + 8, 125); doc.setFont('helvetica', 'normal'); });
+    let y = 156;
+    if (weekly) { doc.setFontSize(9.5); doc.setTextColor(60); doc.text('Completed per day: ' + Object.entries(R.perDay).map(([d, v]) => `${new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })} ${v}`).join('   '), M, y); y += 16; }
+    reportTables(R, weekly).forEach(t => {
+      doc.autoTable({ startY: y + 8, head: [[{ content: `${t.title} (${t.rows.length})`, colSpan: t.head.length, styles: { halign: 'left', fillColor: [232, 239, 243], textColor: accent, fontStyle: 'bold', fontSize: 11 } }], t.head],
+        body: t.rows.length ? t.rows.map(r => r.map(v => String(v ?? ''))) : [[{ content: 'None', colSpan: t.head.length, styles: { textColor: 140, fontStyle: 'italic' } }]],
+        margin: { left: M, right: M }, styles: { fontSize: 8.5, cellPadding: 4, overflow: 'linebreak' }, headStyles: { fillColor: [245, 246, 244], textColor: 60, fontStyle: 'bold' },
+        columnStyles: { 0: { cellWidth: 150 } }, theme: 'grid' });
+      y = doc.lastAutoTable.finalY + 10;
+    });
+    const pages = doc.internal.getNumberOfPages();
+    for (let n = 1; n <= pages; n++) { doc.setPage(n); doc.setFontSize(8); doc.setTextColor(140); doc.text(`${projectName()} · ${APP_URL.replace('https://', '')} · page ${n} of ${pages}`, M, doc.internal.pageSize.getHeight() - 20); }
+    saveBlob(reportFileName(R, weekly, 'pdf'), doc.output('blob'));
+  } catch (e) { console.error(e); toast('Could not make the PDF. Check your connection and try again.'); }
+}
+
 /* ---------- progress reports ---------- */
 const reportState = Object.assign({ mode: 'daily', date: '' }, lsGet('reno-report') || {});
 const STATUS_BY_LABEL = { 'not started': 'planned', planned: 'planned', 'in progress': 'progress', 'on hold': 'hold', completed: 'done', done: 'done' };
@@ -1179,7 +1258,7 @@ function reportRange() {
 async function viewReports(main) {
   const r = reportRange(), weekly = reportState.mode === 'weekly', today = todayISO();
   main.innerHTML = `<div class="section-head no-print"><div><h1>Progress report</h1><p>What was completed, what is moving, what is waiting and what is stuck, with who is responsible for each.</p></div>
-      <div class="row-actions"><button class="btn" id="rpCopy">Copy for WhatsApp</button><button class="btn" id="rpPrint">Print / Save PDF</button></div></div>
+      <div class="row-actions"><button class="btn primary" id="rpPdf" disabled>Download PDF</button><button class="btn" id="rpXlsx" disabled>Download Excel</button><button class="btn" id="rpCopy" disabled>Copy for WhatsApp</button><button class="btn ghost" id="rpPrint">Print</button></div></div>
     <div class="filters no-print rp-controls"><span class="seg" role="group" aria-label="Report type"><button class="btn sm" data-rmode="daily" aria-pressed="${!weekly}">Daily</button><button class="btn sm" data-rmode="weekly" aria-pressed="${weekly}">Weekly</button></span>
       <button class="btn sm" id="rpPrev" aria-label="Previous">‹</button><input type="date" class="field" id="rpDate" value="${esc(reportState.date || today)}" max="${today}" style="width:auto"><button class="btn sm" id="rpNext" aria-label="Next" ${r.to > today ? 'disabled' : ''}>›</button>
       <button class="btn sm ghost" id="rpToday">${weekly ? 'This week' : 'Today'}</button></div>
@@ -1197,6 +1276,9 @@ async function viewReports(main) {
   const R = buildReport(r, log);
   $('#rpBody', main).innerHTML = reportHtml(R, weekly);
   wireCommon($('#rpBody', main));
+  ['#rpPdf', '#rpXlsx', '#rpCopy'].forEach(id => { $(id, main).disabled = false; });
+  $('#rpPdf', main).onclick = () => downloadReportPdf(R, weekly);
+  $('#rpXlsx', main).onclick = () => downloadReportExcel(R, weekly);
   $('#rpCopy', main).onclick = async () => { try { await navigator.clipboard.writeText(reportText(R, weekly)); toast('Report copied. Paste it into WhatsApp.'); } catch { toast('Could not copy on this device'); } };
 }
 function buildReport(r, log) {
