@@ -644,8 +644,8 @@ function renderGate(kind, msg) {
 
 /* ---------- shell ---------- */
 const VIEWS = [
-  { id: 'dashboard', label: 'Dashboard' }, { id: 'items', label: 'Items' }, { id: 'board', label: 'Board' },
-  { id: 'timeline', label: 'Timeline' }, { id: 'photos', label: 'Photos' }, { id: 'aspects', label: 'Aspects' }, { id: 'team', label: 'Team' }
+  { id: 'dashboard', label: 'Dashboard' }, { id: 'aspects', label: 'Aspects' }, { id: 'items', label: 'Items' }, { id: 'board', label: 'Board' },
+  { id: 'photos', label: 'Photos' }, { id: 'timeline', label: 'Timeline' }, { id: 'team', label: 'Team' }
 ];
 const visibleViews = () => VIEWS.filter(v => v.id !== 'team' || can.members());
 const currentView = () => { const h = location.hash.slice(1); return visibleViews().some(v => v.id === h) ? h : 'dashboard'; };
