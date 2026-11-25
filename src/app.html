@@ -532,9 +532,9 @@ function DemoStore() {
     async addPhoto(p) { const id = uid(); db.photos.push({ id, ...p, at: Date.now() }); if (!lsSet(KEY, db)) toast('Photo kept for this visit only: browser storage is full'); state.thumbs = demoThumbs(); thumbsChanged(); return id; },
     async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); state.thumbs = demoThumbs(); thumbsChanged(); },
     async setThumb() {}, async clearThumb() {},
-    async statusBackup() { return { items: db.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent })), comments: [...db.comments], photos: [...db.photos] }; },
+    async statusBackup() { return { items: db.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact })), comments: [...db.comments], photos: [...db.photos] }; },
     async resetStatus() {
-      db.items.forEach(i => Object.assign(i, { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '' }));
+      db.items.forEach(i => Object.assign(i, { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '' }));
       db.comments = []; db.photos = []; persist(); state.thumbs = {}; thumbsChanged();
     },
     async seed() {},
@@ -639,13 +639,13 @@ async function FirebaseStore() {
     async clearThumb(itemId) { await fs.deleteDoc(fs.doc(db, 'thumbs', itemId)); },
     async statusBackup() {
       const all = async name => (await fs.getDocs(col(name))).docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : x.at }; });
-      return { items: state.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent })), comments: await all('comments'), photos: await all('photos') };
+      return { items: state.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact })), comments: await all('comments'), photos: await all('photos') };
     },
     // Owner only: back to Not Started and 0% for every item; remove updates, change history and photos.
     // Aspects, item details, dates, money, team and settings are left as they are.
     async resetStatus(backup) {
       const ops = [];
-      state.items.forEach(i => ops.push(b => b.update(fs.doc(db, 'items', i.id), { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', ...stamp() })));
+      state.items.forEach(i => ops.push(b => b.update(fs.doc(db, 'items', i.id), { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '', ...stamp() })));
       backup.comments.forEach(c => ops.push(b => b.delete(fs.doc(db, 'comments', c.id))));
       backup.photos.forEach(p => ops.push(b => b.delete(fs.doc(db, 'photos', p.id))));
       for (let k = 0; k < ops.length; k += 400) { const b = fs.writeBatch(db); ops.slice(k, k + 400).forEach(f => f(b)); await b.commit(); }
@@ -1008,7 +1008,7 @@ function viewTeam(main) {
       <label>Overall budget (₹)<input class="field num" type="number" min="0" step="1000" id="s_budget" value="${esc(state.settings.budget || '')}"></label>
       <div><button class="btn primary">Save settings</button></div></form></section>
     <section class="panel danger-zone" style="margin-top:16px;max-width:560px"><h2>Reset status data</h2>
-      <p class="small muted" style="margin:4px 0 12px">Start tracking afresh. Every item goes back to Not Started, 0%, no dates and no amounts, and all progress updates, notes, change history and uploaded photos are removed for everyone. Aspects, items, categories, the team and these settings are kept. A backup file downloads first.</p>
+      <p class="small muted" style="margin:4px 0 12px">Start tracking afresh. Every item goes back to Not Started, 0%, unassigned, with no dates or amounts, and all progress updates, notes, change history and uploaded photos are removed for everyone. Aspects, items, categories, the team and these settings are kept. A backup file downloads first.</p>
       <button class="btn danger" type="button" id="resetStatus">Reset status data…</button></section>` : ''}
     <section class="panel" style="margin-top:32px;max-width:640px"><h2>What each role can do</h2>
       <div class="tbl-wrap"><table><tbody>
@@ -1046,6 +1046,7 @@ function confirmResetStatus() {
       <ul class="small" style="margin:6px 0 12px 18px;line-height:1.7">
         <li>Status goes back to <b>Not Started</b> and progress to <b>0%</b>, and all start, due and completion dates are cleared</li>
         <li>All estimates and amounts spent are cleared</li>
+        <li>Every item becomes unassigned (no point of contact)</li>
         <li>All progress updates, notes and change history are deleted</li>
         <li>All uploaded photos are deleted</li></ul>
       <p class="small muted">Kept as they are: aspects, items and their details, categories, the team and project settings (including the overall budget). A backup file of what is removed downloads to this device first.</p>
