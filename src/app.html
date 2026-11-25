@@ -137,6 +137,24 @@ button.kpi:hover { border-color: var(--muted); }
 .hide-btn { color: var(--accent); flex: none; font-weight: 500; }
 .panel > .dsec-head:first-child { margin-top: 0; }
 .dsec-body[hidden] { display: none; }
+.rp-controls .seg .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.rp-title { margin: 4px 0 14px; } .rp-title h2 { font-size: 20px; } .rp-title p { margin: 2px 0 0; }
+.rp-kpis .kpi .value { font-size: 26px; }
+.rp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
+.rp-sec { margin-bottom: 16px; }
+.rp-grid .rp-sec { margin-bottom: 0; }
+.rp-note { margin: -4px 0 6px 2px; padding: 6px 10px; background: var(--sunken); border-radius: 6px; color: var(--muted); }
+.rp-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center; }
+.rp-days > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.rp-bar { height: 70px; width: 22px; background: var(--sunken); border-radius: 4px; display: flex; align-items: flex-end; overflow: hidden; }
+.rp-bar i { display: block; width: 100%; background: var(--done); }
+@media print {
+  .topbar, .banner, .no-print, .hide-btn, #toast { display: none !important; }
+  body { background: #fff !important; }
+  .panel, .kpi { break-inside: avoid; box-shadow: none !important; }
+  .rp-grid { display: block; } .rp-grid .rp-sec { margin-bottom: 12px; }
+}
+
 .money-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit; color: inherit; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-width: 0; }
 .money-tile:hover { border-color: var(--accent); }
 .money-tile .go { color: var(--accent); font-weight: 500; }
@@ -502,6 +520,7 @@ function DemoStore() {
     async deleteMember(email) { db.members = db.members.filter(m => m.email !== email); persist(); },
     async saveSettings(data) { Object.assign(db.settings, data); persist(); },
     async comments(itemId) { return db.comments.filter(c => c.itemId === itemId); },
+    async commentsBetween(from, to) { return db.comments.filter(c => c.at >= from && c.at < to); },
     async addComment(c) { db.comments.push({ id: uid(), ...c, at: Date.now() }); if (!lsSet(KEY, db)) {} },
     async photos(itemId) { return db.photos.filter(p => p.itemId === itemId); },
     async allPhotos() { return [...db.photos]; },
@@ -577,6 +596,10 @@ async function FirebaseStore() {
       return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
     },
     async addComment(c) { await fs.addDoc(col('comments'), { ...c, at: fs.serverTimestamp() }); },
+    async commentsBetween(from, to) {
+      const s = await fs.getDocs(fs.query(col('comments'), fs.where('at', '>=', fs.Timestamp.fromMillis(from)), fs.where('at', '<', fs.Timestamp.fromMillis(to))));
+      return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
+    },
     async photos(itemId) {
       const s = await fs.getDocs(fs.query(col('photos'), fs.where('itemId', '==', itemId)));
       return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
@@ -645,7 +668,7 @@ function renderGate(kind, msg) {
 /* ---------- shell ---------- */
 const VIEWS = [
   { id: 'dashboard', label: 'Dashboard' }, { id: 'aspects', label: 'Aspects' }, { id: 'items', label: 'Items' }, { id: 'board', label: 'Board' },
-  { id: 'photos', label: 'Photos' }, { id: 'timeline', label: 'Timeline' }, { id: 'team', label: 'Team' }
+  { id: 'photos', label: 'Photos' }, { id: 'timeline', label: 'Timeline' }, { id: 'reports', label: 'Reports' }, { id: 'team', label: 'Team' }
 ];
 const visibleViews = () => VIEWS.filter(v => v.id !== 'team' || can.members());
 const currentView = () => { const h = location.hash.slice(1); return visibleViews().some(v => v.id === h) ? h : 'dashboard'; };
@@ -670,7 +693,7 @@ function render() {
   $('#shareApp')?.addEventListener('click', () => openShare());
   if ($('#share')?.open) renderShare();
   const main = $('#main');
-  ({ dashboard: viewDashboard, items: viewItems, board: viewBoard, timeline: viewTimeline, aspects: viewAspects, team: viewTeam, photos: viewPhotos })[v](main);
+  ({ dashboard: viewDashboard, items: viewItems, board: viewBoard, timeline: viewTimeline, aspects: viewAspects, team: viewTeam, photos: viewPhotos, reports: viewReports })[v](main);
 }
 
 function sortedAspects() { return [...state.aspects].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name)); }
@@ -752,7 +775,8 @@ async function quickStatus(id, status) {
   const patch = { status };
   if (status === 'done') { patch.progress = 100; if (!it.actualDate) patch.actualDate = todayISO(); }
   if (status === 'progress' && !(Number(it.progress) > 0)) patch.progress = 10;
-  try { await store.saveItem(id, patch); logChanges(it, patch); toast(`${it.title}: ${ST[status].label}`); }
+  const before = { ...it };
+  try { await store.saveItem(id, patch); logChanges(before, patch); toast(`${it.title}: ${ST[status].label}`); }
   catch (e) { console.error(e); toast('You do not have permission to change this.'); render(); }
 }
 
@@ -1034,7 +1058,8 @@ function logChanges(before, patch) {
   const labels = { status: 'Status', progress: 'Progress', contact: 'Point of contact', plannedStart: 'Planned start', plannedEnd: 'Planned end', actualDate: 'Actual date', estimate: 'Estimate', actualSpent: 'Actual spent', title: 'Title', daysRequired: 'Days required', aspectId: 'Aspect' };
   const fmt = (k, v) => k === 'status' ? (ST[v] || ST.planned).label : k === 'progress' ? (v || 0) + '%' : k === 'contact' ? memberName(v) || 'nobody' : k === 'aspectId' ? aspectName(v) : (k === 'estimate' || k === 'actualSpent') ? inr(v) : /Date|planned/i.test(k) ? fmtDateY(v) : v;
   const parts = Object.keys(labels).filter(k => k in patch && String(patch[k] ?? '') !== String(before[k] ?? '')).map(k => `${labels[k]}: ${fmt(k, before[k]) || 'empty'} → ${fmt(k, patch[k]) || 'empty'}`);
-  if (parts.length && before.id) store.addComment({ itemId: before.id, by: state.user.email, kind: 'change', text: parts.join(' · ') }).catch(() => {});
+  const changes = {}; ['status', 'progress', 'contact'].forEach(k => { if (k in patch && String(patch[k] ?? '') !== String(before[k] ?? '')) changes[k] = [before[k] ?? '', patch[k] ?? '']; });
+  if (parts.length && before.id) store.addComment({ itemId: before.id, by: state.user.email, kind: 'change', text: parts.join(' · '), changes }).catch(() => {});
 }
 
 function openItem(id, defaults = {}) {
@@ -1091,7 +1116,8 @@ function openItem(id, defaults = {}) {
     // Only send fields that changed (contractors may only touch their fields)
     const patch = isNew ? { ...blankItem(), ...data } : Object.fromEntries(Object.entries(data).filter(([k, v]) => String(v ?? '') !== String(it[k] ?? '')));
     if (!isNew && !Object.keys(patch).length) { dlg.close(); return; }
-    try { await store.saveItem(isNew ? null : it.id, patch); if (!isNew) logChanges(it, patch); dlg.close(); toast(isNew ? 'Item added' : 'Saved'); }
+    const before = { ...it };
+    try { await store.saveItem(isNew ? null : it.id, patch); if (!isNew) logChanges(before, patch); dlg.close(); toast(isNew ? 'Item added' : 'Saved'); }
     catch (err) { console.error(err); $('#f_msg').textContent = 'Could not save. You may not have permission to change some of these fields.'; }
   };
   const del = $('#f_del');
@@ -1132,6 +1158,121 @@ const hiddenSecs = () => lsGet('reno-hidden-secs') || {};
 const secHidden = id => hiddenSecs()[id] ? 'hidden' : '';
 const hideBtn = id => `<button type="button" class="btn sm ghost hide-btn" data-hide="${id}" aria-expanded="${!hiddenSecs()[id]}">${hiddenSecs()[id] ? 'Show' : 'Hide'}</button>`;
 const secHead = (id, title, style = '') => `<div class="dsec-head" style="${style}">${title.replace('<h2>', '<h2 style="margin:0">')}${hideBtn(id)}</div>`;
+
+/* ---------- progress reports ---------- */
+const reportState = Object.assign({ mode: 'daily', date: '' }, lsGet('reno-report') || {});
+const STATUS_BY_LABEL = { 'not started': 'planned', planned: 'planned', 'in progress': 'progress', 'on hold': 'hold', completed: 'done', done: 'done' };
+// Turn a change entry into { status: [from, to], progress: [from, to] }, reading older text-only entries too
+function parseChange(c) {
+  if (c.changes) return c.changes;
+  const out = {}, t = c.text || '';
+  const st = t.match(/Status: ([^·→]+?) → ([^·]+?)(?: ·|$)/); if (st) out.status = [STATUS_BY_LABEL[st[1].trim().toLowerCase()] || '', STATUS_BY_LABEL[st[2].trim().toLowerCase()] || ''];
+  const pr = t.match(/Progress: (\d+)% → (\d+)%/); if (pr) out.progress = [Number(pr[1]), Number(pr[2])];
+  return out;
+}
+const weekStart = iso => { const n = dayNum(iso), dow = (new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7; return isoFromNum(n - dow); };
+const localMs = iso => new Date(iso + 'T00:00:00').getTime();
+function reportRange() {
+  const base = reportState.date || todayISO();
+  if (reportState.mode === 'weekly') { const s = weekStart(base); return { from: s, to: isoFromNum(dayNum(s) + 7), label: `Week of ${fmtDateY(s)} to ${fmtDateY(isoFromNum(dayNum(s) + 6))}` }; }
+  return { from: base, to: isoFromNum(dayNum(base) + 1), label: new Date(base + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) };
+}
+async function viewReports(main) {
+  const r = reportRange(), weekly = reportState.mode === 'weekly', today = todayISO();
+  main.innerHTML = `<div class="section-head no-print"><div><h1>Progress report</h1><p>What was completed, what is moving, what is waiting and what is stuck, with who is responsible for each.</p></div>
+      <div class="row-actions"><button class="btn" id="rpCopy">Copy for WhatsApp</button><button class="btn" id="rpPrint">Print / Save PDF</button></div></div>
+    <div class="filters no-print rp-controls"><span class="seg" role="group" aria-label="Report type"><button class="btn sm" data-rmode="daily" aria-pressed="${!weekly}">Daily</button><button class="btn sm" data-rmode="weekly" aria-pressed="${weekly}">Weekly</button></span>
+      <button class="btn sm" id="rpPrev" aria-label="Previous">‹</button><input type="date" class="field" id="rpDate" value="${esc(reportState.date || today)}" max="${today}" style="width:auto"><button class="btn sm" id="rpNext" aria-label="Next" ${r.to > today ? 'disabled' : ''}>›</button>
+      <button class="btn sm ghost" id="rpToday">${weekly ? 'This week' : 'Today'}</button></div>
+    <div id="rpBody"><p class="muted">Preparing the report…</p></div>`;
+  main.querySelectorAll('[data-rmode]').forEach(b => b.onclick = () => { reportState.mode = b.dataset.rmode; lsSet('reno-report', reportState); render(); });
+  const shift = d => { reportState.date = isoFromNum(dayNum(reportState.date || today) + d); if (reportState.date > today) reportState.date = today; lsSet('reno-report', reportState); render(); };
+  $('#rpPrev', main).onclick = () => shift(weekly ? -7 : -1);
+  $('#rpNext', main).onclick = () => shift(weekly ? 7 : 1);
+  $('#rpToday', main).onclick = () => { reportState.date = ''; lsSet('reno-report', reportState); render(); };
+  $('#rpDate', main).onchange = e => { reportState.date = e.target.value || ''; lsSet('reno-report', reportState); render(); };
+  $('#rpPrint', main).onclick = () => window.print();
+  let log = [];
+  try { log = await store.commentsBetween(localMs(r.from), localMs(r.to)); } catch (e) { console.error(e); }
+  if (!document.body.contains(main) || currentView() !== 'reports') return;
+  const R = buildReport(r, log);
+  $('#rpBody', main).innerHTML = reportHtml(R, weekly);
+  wireCommon($('#rpBody', main));
+  $('#rpCopy', main).onclick = async () => { try { await navigator.clipboard.writeText(reportText(R, weekly)); toast('Report copied. Paste it into WhatsApp.'); } catch { toast('Could not copy on this device'); } };
+}
+function buildReport(r, log) {
+  const items = state.items, byId = new Map(items.map(i => [i.id, i]));
+  const changes = log.filter(c => c.kind === 'change' && byId.has(c.itemId)).sort((a, b) => a.at - b.at);
+  const notes = log.filter(c => c.kind !== 'change' && byId.has(c.itemId)).sort((a, b) => a.at - b.at);
+  const completed = new Map(), started = new Map(), held = new Map(), moved = new Map();
+  changes.forEach(c => {
+    const ch = parseChange(c), it = byId.get(c.itemId);
+    if (ch.status && ch.status[1] === 'done') completed.set(it.id, { it, by: c.by, at: c.at });
+    if (ch.status && ch.status[1] === 'progress') started.set(it.id, { it, by: c.by, at: c.at });
+    if (ch.status && ch.status[1] === 'hold') held.set(it.id, { it, by: c.by, at: c.at });
+    if (ch.progress) { const m = moved.get(it.id) || { it, from: Number(ch.progress[0]) || 0, by: c.by }; m.to = Number(ch.progress[1]) || 0; m.by = c.by; moved.set(it.id, m); }
+  });
+  // Items marked complete with a completion date in this period, even without a logged change
+  items.forEach(i => { if (i.status === 'done' && i.actualDate && i.actualDate >= r.from && i.actualDate < r.to && !completed.has(i.id)) completed.set(i.id, { it: i, by: i.updatedBy, at: localMs(i.actualDate) }); });
+  const now = s => items.filter(i => (i.status || 'planned') === s);
+  const overdue = items.filter(isLate).sort((a, b) => a.plannedEnd.localeCompare(b.plannedEnd));
+  const pendingDue = now('planned').filter(i => (i.plannedStart && i.plannedStart < r.to) || (i.plannedEnd && i.plannedEnd < isoFromNum(dayNum(r.to) + 7)));
+  const people = new Map();
+  const P = email => { const k = email || ''; if (!people.has(k)) people.set(k, { email: k, open: 0, prog: 0, hold: 0, late: 0, done: 0, updates: 0 }); return people.get(k); };
+  items.forEach(i => { const p = P(i.contact); if (i.status !== 'done') p.open++; if (i.status === 'progress') p.prog++; if (i.status === 'hold') p.hold++; if (isLate(i)) p.late++; });
+  completed.forEach(({ it }) => P(it.contact).done++);
+  const touched = new Set(); changes.concat(notes).forEach(c => touched.add(c.itemId + '|' + c.by));
+  touched.forEach(k => { const [id] = k.split('|'); P(byId.get(id).contact).updates++; });
+  const perDay = {}; if (r.to > r.from) for (let n = dayNum(r.from); n < dayNum(r.to); n++) perDay[isoFromNum(n)] = 0;
+  completed.forEach(({ at }) => { const d = new Date(at), iso = new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); if (iso in perDay) perDay[iso]++; });
+  return { r, completed: [...completed.values()], started: [...started.values()].filter(x => !completed.has(x.it.id)), held: [...held.values()], moved: [...moved.values()].filter(m => m.to !== m.from && !completed.has(m.it.id)),
+    inProgress: now('progress'), onHold: now('hold'), pending: now('planned'), pendingDue, overdue, notes, changes, perDay,
+    people: [...people.values()].filter(p => p.open || p.done || p.updates).sort((a, b) => (a.email ? 0 : 1) - (b.email ? 0 : 1) || b.late - a.late || b.open - a.open),
+    pct: avgProgress(items), total: items.length, doneTotal: now('done').length };
+}
+function reportHtml(R, weekly) {
+  const who = e => e ? esc(memberName(e)) : '<span class="muted">No contact</span>';
+  const line = (i, right = '') => `<div class="list-row" data-open="${esc(i.id)}">${th(i.id)}<div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))} · Responsible: ${who(i.contact)}</span></div><span class="small" style="text-align:right">${right}</span></div>`;
+  const sec = (title, n, body, empty) => `<section class="panel rp-sec"><div class="dsec-head"><h2 style="margin:0">${title} <span class="muted small">(${n})</span></h2></div>${n ? body : `<p class="small muted">${empty}</p>`}</section>`;
+  const lastNote = id => { const n = [...R.notes].reverse().find(c => c.itemId === id); return n ? `<div class="small rp-note">“${esc(n.text.slice(0, 140))}” · ${esc(memberName(n.by))}</div>` : ''; };
+  const days = Object.entries(R.perDay), maxDay = Math.max(1, ...days.map(([, v]) => v));
+  return `<div class="rp-title"><h2>${weekly ? 'Weekly' : 'Daily'} progress report</h2><p class="muted">${esc(R.r.label)} · ${esc(projectName())}</p></div>
+  <div class="kpis rp-kpis">
+    <div class="kpi"><div class="label">Completed ${weekly ? 'this week' : 'today'}</div><div class="value num" style="color:var(--done)">${R.completed.length}</div><div class="sub">${R.doneTotal} of ${R.total} done overall</div></div>
+    <div class="kpi"><div class="label">In progress</div><div class="value num" style="color:var(--progress)">${R.inProgress.length}</div><div class="sub">${R.moved.length} moved forward</div></div>
+    <div class="kpi"><div class="label">Pending</div><div class="value num">${R.pending.length}</div><div class="sub">not started yet</div></div>
+    <div class="kpi"><div class="label">On hold</div><div class="value num" style="color:var(--hold)">${R.onHold.length}</div><div class="sub">waiting</div></div>
+    <div class="kpi"><div class="label">Overdue</div><div class="value num" style="color:${R.overdue.length ? 'var(--late)' : 'inherit'}">${R.overdue.length}</div><div class="sub">past planned end</div></div>
+    <div class="kpi"><div class="label">Overall progress</div><div class="value num">${R.pct}%</div><div class="bar"><i style="width:${R.pct}%"></i></div></div>
+  </div>
+  ${weekly ? `<section class="panel rp-sec"><div class="dsec-head"><h2 style="margin:0">Completed per day</h2></div><div class="rp-days">${days.map(([d, v]) => `<div><div class="rp-bar"><i style="height:${Math.round(v / maxDay * 100)}%"></i></div><b class="num">${v}</b><span class="small muted">${new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}</span></div>`).join('')}</div></section>` : ''}
+  <div class="rp-grid">
+  ${sec('✅ Completed', R.completed.length, R.completed.map(c => line(c.it, `Completed${c.by ? ' by ' + esc(memberName(c.by)) : ''}<br><span class="muted">${fmtDate(new Date(c.at - new Date(c.at).getTimezoneOffset() * 6e4).toISOString().slice(0, 10))}</span>`)).join(''), `Nothing was marked completed ${weekly ? 'this week' : 'on this day'}.`)}
+  ${sec('🔄 Work in progress', R.inProgress.length, R.inProgress.sort((a, b) => (Number(b.progress) || 0) - (Number(a.progress) || 0)).map(i => { const m = R.moved.find(x => x.it.id === i.id); return line(i, `<b class="num">${Number(i.progress) || 0}%</b>${m ? `<br><span style="color:var(--done)">+${m.to - m.from}% ${weekly ? 'this week' : 'today'}</span>` : i.plannedEnd ? `<br><span class="muted">Due ${fmtDate(i.plannedEnd)}</span>` : ''}`); }).join(''), 'No work is in progress right now.')}
+  ${sec('⏸️ On hold', R.onHold.length, R.onHold.map(i => line(i, i.plannedEnd ? `Due ${fmtDate(i.plannedEnd)}` : '') + lastNote(i.id)).join(''), 'Nothing is on hold.')}
+  ${sec('⚠️ Challenges and delays', R.overdue.length, R.overdue.map(i => line(i, `<span style="color:var(--late)">${dayNum(todayISO()) - dayNum(i.plannedEnd)} days late</span><br><span class="muted">was due ${fmtDate(i.plannedEnd)}</span>`) + lastNote(i.id)).join(''), 'No item is overdue.')}
+  ${sec('🕒 Pending, due to start soon', R.pendingDue.length, R.pendingDue.map(i => line(i, i.plannedStart ? `Start ${fmtDate(i.plannedStart)}` : `Due ${fmtDate(i.plannedEnd)}`)).join('') + `<p class="small muted" style="margin-top:8px">${R.pending.length - R.pendingDue.length} other items are not started and have no date in the next week.</p>`, `${R.pending.length} items are not started; none are due to start in the next week.`)}
+  ${sec('💬 Notes and updates from the team', R.notes.length, R.notes.map(c => `<div class="list-row" data-open="${esc(c.itemId)}"><div class="t"><b>${esc(state.items.find(i => i.id === c.itemId).title)}</b><div class="small">“${esc(c.text)}”</div><div class="small muted">${esc(memberName(c.by))} · ${new Date(c.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</div></div></div>`).join(''), `No comments were posted ${weekly ? 'this week' : 'on this day'}.`)}
+  </div>
+  <section class="panel rp-sec"><div class="dsec-head"><h2 style="margin:0">👥 Accountability by person</h2></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Person</th><th class="num">Completed ${weekly ? 'this week' : 'today'}</th><th class="num">Updates made</th><th class="num">In progress</th><th class="num">On hold</th><th class="num">Overdue</th><th class="num">Open items</th></tr></thead><tbody>
+    ${R.people.map(p => `<tr><td>${p.email ? `<b>${esc(memberName(p.email))}</b>` : '<span class="muted">No contact assigned</span>'}</td><td class="num">${p.done}</td><td class="num">${p.updates}</td><td class="num">${p.prog}</td><td class="num">${p.hold}</td><td class="num" style="${p.late ? 'color:var(--late);font-weight:600' : ''}">${p.late}</td><td class="num">${p.open}</td></tr>`).join('')}
+    </tbody></table></div><p class="small muted">"Updates made" counts items where someone recorded a change or comment in this period, grouped by the person responsible for the item.</p></section>
+  <p class="small muted">In progress, On hold, Pending and Overdue show each item's status today. Completed, progress moved and notes are for the period shown.</p>`;
+}
+function reportText(R, weekly) {
+  const nm = i => `${i.title}${i.contact ? ' (' + memberName(i.contact) + ')' : ''}`;
+  const L = [];
+  L.push(`*${weekly ? 'Weekly' : 'Daily'} Progress Report*`, `${R.r.label}`, `${projectName()}`, '');
+  L.push(`Overall progress: ${R.pct}% · ${R.doneTotal}/${R.total} items completed`, '');
+  L.push(`✅ *Completed (${R.completed.length})*`); R.completed.forEach(c => L.push(`• ${nm(c.it)}`)); if (!R.completed.length) L.push('• None'); L.push('');
+  L.push(`🔄 *In progress (${R.inProgress.length})*`); R.inProgress.forEach(i => { const m = R.moved.find(x => x.it.id === i.id); L.push(`• ${nm(i)}: ${Number(i.progress) || 0}%${m ? ` (+${m.to - m.from}%)` : ''}`); }); if (!R.inProgress.length) L.push('• None'); L.push('');
+  L.push(`⏸️ *On hold (${R.onHold.length})*`); R.onHold.forEach(i => L.push(`• ${nm(i)}`)); if (!R.onHold.length) L.push('• None'); L.push('');
+  L.push(`⚠️ *Overdue (${R.overdue.length})*`); R.overdue.forEach(i => L.push(`• ${nm(i)}: due ${fmtDate(i.plannedEnd)}`)); if (!R.overdue.length) L.push('• None'); L.push('');
+  L.push(`🕒 *Pending: ${R.pending.length} not started*${R.pendingDue.length ? `, ${R.pendingDue.length} due to start soon:` : ''}`); R.pendingDue.forEach(i => L.push(`• ${nm(i)}`));
+  L.push('', APP_URL);
+  return L.join('\n');
+}
 
 /* ---------- money details ---------- */
 function moneyDialog(kind) {
