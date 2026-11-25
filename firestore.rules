@@ -29,7 +29,8 @@ service cloud.firestore {
     }
     match /aspects/{id} {
       allow read: if isMember();
-      allow create, update: if isManager();
+      allow create: if isOwner();
+      allow update: if isManager();
       allow delete: if isOwner();
     }
     match /items/{id} {
