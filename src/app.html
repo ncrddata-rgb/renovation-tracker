@@ -711,7 +711,8 @@ const VIEWS = [
   { id: 'dashboard', label: 'Dashboard' }, { id: 'aspects', label: 'Aspects' }, { id: 'items', label: 'Items' }, { id: 'board', label: 'Board' },
   { id: 'photos', label: 'Photos' }, { id: 'timeline', label: 'Timeline' }, { id: 'reports', label: 'Reports' }, { id: 'team', label: 'Team' }
 ];
-const visibleViews = () => VIEWS.filter(v => v.id !== 'team' || can.members());
+const OWNER_VIEWS = ['team', 'reports'];
+const visibleViews = () => VIEWS.filter(v => !OWNER_VIEWS.includes(v.id) || can.members());
 const currentView = () => { const h = location.hash.slice(1); return visibleViews().some(v => v.id === h) ? h : 'dashboard'; };
 window.addEventListener('hashchange', () => { openSecs.clear(); if (state.ready) render(); window.scrollTo(0, 0); });
 try { localStorage.removeItem('reno-hidden-secs'); } catch {}
