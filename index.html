@@ -480,7 +480,8 @@ const can = {
   editProgress: () => ['owner', 'manager', 'engineer', 'contractor'].includes(role()),
   deleteItem: () => ['owner', 'manager', 'engineer'].includes(role()),
   deleteAspect: () => role() === 'owner',
-  members: () => role() === 'owner'
+  members: () => role() === 'owner',
+  addNew: () => role() === 'owner' // adding aspects and items
 };
 const deadline = () => state.settings.deadline || CFG.deadline || '2026-12-25';
 const projectName = () => state.settings.projectName || CFG.projectName || 'House Renovation';
@@ -815,7 +816,7 @@ function seedPanel() {
 
 function wireCommon(root) {
   root.querySelectorAll('[data-open]').forEach(el => el.addEventListener('click', e => { if (e.target.closest('select,button:not([data-open]),a')) return; openItem(el.dataset.open); }));
-  root.querySelectorAll('[data-add-item]').forEach(b => b.onclick = () => openItem(null, { aspectId: b.dataset.addItem || '' }));
+  root.querySelectorAll('[data-add-item]').forEach(b => b.onclick = () => { if (can.addNew()) openItem(null, { aspectId: b.dataset.addItem || '' }); });
   const sb = $('#seedBtn', root); if (sb) sb.onclick = async () => { sb.disabled = true; sb.textContent = 'Loading…'; try { await store.seed(window.SEED); toast('Excel plan loaded'); } catch (e) { console.error(e); toast('Could not load the plan. Check the security rules.'); sb.disabled = false; } };
   root.querySelectorAll('select[data-status-of]').forEach(s => s.onchange = () => quickStatus(s.dataset.statusOf, s.value));
 }
@@ -876,13 +877,13 @@ function viewItems(main) {
   const filtering = Object.values(state.filters).some(Boolean);
   main.innerHTML = `
     <div class="section-head"><div><h1>Items</h1><p>${list.length} of ${state.items.length} items shown</p></div>
-      <div class="row-actions">${can.editAll() ? '<button class="btn primary" data-add-item>+ Add item</button>' : ''}</div></div>
+      <div class="row-actions">${can.addNew() ? '<button class="btn primary" data-add-item>+ Add item</button>' : ''}</div></div>
     ${state.items.length === 0 ? seedPanel() : ''}
     ${filterBar()}
     ${groups.filter(g => g.its.length || !filtering).map(({ a, its }) => `
       <section class="group">
         <div class="group-head"><h2>${esc(a.name)}</h2><span class="small muted">${a.floor ? esc(a.floor) + ' · ' : ''}${its.length} item${its.length === 1 ? '' : 's'}</span><div class="bar"><i style="width:${avgProgress(its)}%"></i></div>
-          <span style="margin-left:auto"></span>${can.editAll() && a.id ? `<button class="btn sm ghost" data-add-item="${esc(a.id)}">+ Item</button>` : ''}</div>
+          <span style="margin-left:auto"></span>${can.addNew() && a.id ? `<button class="btn sm ghost" data-add-item="${esc(a.id)}">+ Item</button>` : ''}</div>
         ${its.map(i => `<div class="item-row">
           <div>${statusSelect(i)}</div>
           <div class="title" data-open="${esc(i.id)}"><b>${esc(i.title)}</b><div class="meta">${i.trade ? `<span class="tag">${esc(i.trade)}</span>` : ''}${i.floor ? `<span class="tag">${esc(i.floor)}</span>` : ''}${i.priority === 'High' ? '<span class="tag" style="color:var(--late)">High priority</span>' : ''}${i.nextSteps ? esc(i.nextSteps.slice(0, 90)) + (i.nextSteps.length > 90 ? '…' : '') : ''}</div></div>
@@ -962,14 +963,14 @@ function viewTimeline(main) {
 function viewAspects(main) {
   const asp = sortedAspects();
   main.innerHTML = `<div class="section-head"><div><h1>Renovation aspects</h1><p>The areas of work, such as Kitchen or Lift. Add one whenever something new comes up.</p></div>
-    ${can.members() ? '<button class="btn primary" id="addAspect">+ Add aspect</button>' : ''}</div>
+    ${can.addNew() ? '<button class="btn primary" id="addAspect">+ Add aspect</button>' : ''}</div>
     <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Aspect</th><th>Floor</th><th>Items</th><th>Completed</th><th>Spent / Estimate</th><th></th></tr></thead><tbody>
     ${asp.map((a, n) => { const its = itemsOf(a.id); const e = its.reduce((s, i) => s + (Number(i.estimate) || 0), 0), sp = its.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0); return `<tr>
       <td class="num muted">${n + 1}</td><td><b>${esc(a.name)}</b>${a.notes ? `<div class="small muted">${esc(a.notes)}</div>` : ''}</td><td>${esc(a.floor || '')}</td><td class="num">${its.length}</td><td class="num">${its.filter(i => i.status === 'done').length}</td><td class="num small">${e || sp ? `${inrShort(sp)} / ${inrShort(e)}` : '<span class="muted">None yet</span>'}</td>
-      <td style="white-space:nowrap">${can.editAll() ? `<button class="btn sm ghost" data-up="${n}" aria-label="Move up" ${n === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-down="${n}" aria-label="Move down" ${n === asp.length - 1 ? 'disabled' : ''}>↓</button><button class="btn sm" data-edit-aspect="${esc(a.id)}">Edit</button> <button class="btn sm" data-add-item="${esc(a.id)}">+ Item</button>` : `<button class="btn sm" onclick="location.hash='items'">View</button>`}</td></tr>`; }).join('')}
+      <td style="white-space:nowrap">${can.editAll() ? `<button class="btn sm ghost" data-up="${n}" aria-label="Move up" ${n === 0 ? 'disabled' : ''}>↑</button><button class="btn sm ghost" data-down="${n}" aria-label="Move down" ${n === asp.length - 1 ? 'disabled' : ''}>↓</button><button class="btn sm" data-edit-aspect="${esc(a.id)}">Edit</button>${can.addNew() ? ` <button class="btn sm" data-add-item="${esc(a.id)}">+ Item</button>` : ''}` : `<button class="btn sm" onclick="location.hash='items'">View</button>`}</td></tr>`; }).join('')}
     </tbody></table></div>`;
   wireCommon(main);
-  $('#addAspect', main)?.addEventListener('click', () => { if (can.members()) editAspect(null); });
+  $('#addAspect', main)?.addEventListener('click', () => { if (can.addNew()) editAspect(null); });
   main.querySelectorAll('[data-edit-aspect]').forEach(b => b.onclick = () => editAspect(b.dataset.editAspect));
   const swap = async (i, j) => { const A = asp[i], B = asp[j]; await Promise.all(asp.map((x, k) => store.saveAspect(x.id, { order: k === i ? j + 1 : k === j ? i + 1 : k + 1 }))); };
   main.querySelectorAll('[data-up]').forEach(b => b.onclick = () => swap(+b.dataset.up, +b.dataset.up - 1));

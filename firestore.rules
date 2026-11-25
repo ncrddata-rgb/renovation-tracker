@@ -35,7 +35,7 @@ service cloud.firestore {
     }
     match /items/{id} {
       allow read: if isMember();
-      allow create: if isManager();
+      allow create: if isOwner();
       allow update: if isManager() || (isContractor() && contractorFieldsOnly());
       allow delete: if isManager();
     }
