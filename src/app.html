@@ -532,6 +532,11 @@ function DemoStore() {
     async addPhoto(p) { const id = uid(); db.photos.push({ id, ...p, at: Date.now() }); if (!lsSet(KEY, db)) toast('Photo kept for this visit only: browser storage is full'); state.thumbs = demoThumbs(); thumbsChanged(); return id; },
     async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); state.thumbs = demoThumbs(); thumbsChanged(); },
     async setThumb() {}, async clearThumb() {},
+    async statusBackup() { return { items: db.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate })), comments: [...db.comments], photos: [...db.photos] }; },
+    async resetStatus() {
+      db.items.forEach(i => Object.assign(i, { status: 'planned', progress: 0, actualDate: '' }));
+      db.comments = []; db.photos = []; persist(); state.thumbs = {}; thumbsChanged();
+    },
     async seed() {},
     async signOut() {},
     reset() { db = fresh(); state.user.email = 'demo.owner@example.com'; persist(); }
@@ -632,6 +637,22 @@ async function FirebaseStore() {
     async deletePhoto(id) { await fs.deleteDoc(fs.doc(db, 'photos', id)); },
     async setThumb(itemId, data, photoId) { await fs.setDoc(fs.doc(db, 'thumbs', itemId), { data, photoId, by: state.user.email, at: fs.serverTimestamp() }); },
     async clearThumb(itemId) { await fs.deleteDoc(fs.doc(db, 'thumbs', itemId)); },
+    async statusBackup() {
+      const all = async name => (await fs.getDocs(col(name))).docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : x.at }; });
+      return { items: state.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate })), comments: await all('comments'), photos: await all('photos') };
+    },
+    // Owner only: back to Not Started and 0% for every item; remove updates, change history and photos.
+    // Aspects, item details, dates, money, team and settings are left as they are.
+    async resetStatus(backup) {
+      const ops = [];
+      state.items.forEach(i => ops.push(b => b.update(fs.doc(db, 'items', i.id), { status: 'planned', progress: 0, actualDate: '', ...stamp() })));
+      backup.comments.forEach(c => ops.push(b => b.delete(fs.doc(db, 'comments', c.id))));
+      backup.photos.forEach(p => ops.push(b => b.delete(fs.doc(db, 'photos', p.id))));
+      for (let k = 0; k < ops.length; k += 400) { const b = fs.writeBatch(db); ops.slice(k, k + 400).forEach(f => f(b)); await b.commit(); }
+      // Thumbnails are optional; ignore if the database rules do not cover them yet
+      try { const t = await fs.getDocs(col('thumbs')); for (let k = 0; k < t.docs.length; k += 400) { const b = fs.writeBatch(db); t.docs.slice(k, k + 400).forEach(d => b.delete(d.ref)); await b.commit(); } } catch {}
+      state.thumbs = {}; thumbsChanged();
+    },
     async seed(S) {
       const b = fs.writeBatch(db);
       S.aspects.forEach(a => b.set(fs.doc(db, 'aspects', a.id), { name: a.name, floor: a.floor, order: a.order, notes: '' }));
@@ -985,7 +1006,10 @@ function viewTeam(main) {
       <label class="full">Project name<input class="field" id="s_name" value="${esc(projectName())}"></label>
       <label>Hand-over date<input class="field" type="date" id="s_deadline" value="${esc(deadline())}"></label>
       <label>Overall budget (₹)<input class="field num" type="number" min="0" step="1000" id="s_budget" value="${esc(state.settings.budget || '')}"></label>
-      <div><button class="btn primary">Save settings</button></div></form></section>` : ''}
+      <div><button class="btn primary">Save settings</button></div></form></section>
+    <section class="panel danger-zone" style="margin-top:16px;max-width:560px"><h2>Reset status data</h2>
+      <p class="small muted" style="margin:4px 0 12px">Start tracking afresh. Every item goes back to Not Started and 0%, and all progress updates, notes, change history and uploaded photos are removed for everyone. Aspects, items, categories, dates, amounts, the team and these settings are kept. A backup file downloads first.</p>
+      <button class="btn danger" type="button" id="resetStatus">Reset status data…</button></section>` : ''}
     <section class="panel" style="margin-top:32px;max-width:640px"><h2>What each role can do</h2>
       <div class="tbl-wrap"><table><tbody>
       <tr><td><b>Owner</b></td><td>Everything. Only Owners can manage the team and project settings.</td></tr>
@@ -1007,10 +1031,41 @@ function viewTeam(main) {
   });
   main.querySelectorAll('[data-contact]').forEach(b => b.onclick = () => setFilters({ contact: b.dataset.contact }));
   main.querySelectorAll('[data-invite]').forEach(b => b.onclick = () => shareInvite(b.dataset.invite));
+  $('#resetStatus', main)?.addEventListener('click', confirmResetStatus);
   const sf = $('#sf', main);
   if (sf) sf.onsubmit = async e => { e.preventDefault(); try { await store.saveSettings({ projectName: $('#s_name').value.trim(), deadline: $('#s_deadline').value || '2026-12-25', budget: Number($('#s_budget').value) || 0 }); toast('Settings saved'); } catch { toast('Could not save settings'); } };
 }
 
+function confirmResetStatus() {
+  if (!can.members()) return;
+  const dlg = $('#dlg');
+  const nItems = state.items.length;
+  dlg.innerHTML = `<div class="dlg-head"><h2>Reset status data?</h2><button class="btn" type="button" data-close>← Back</button></div>
+    <div class="dlg-body">
+      <p><b>This cannot be undone.</b> For all ${nItems} items, for everyone using the app:</p>
+      <ul class="small" style="margin:6px 0 12px 18px;line-height:1.7">
+        <li>Status goes back to <b>Not Started</b> and progress to <b>0%</b>, with completion dates cleared</li>
+        <li>All progress updates, notes and change history are deleted</li>
+        <li>All uploaded photos are deleted</li></ul>
+      <p class="small muted">Kept as they are: aspects, items and their details, categories, planned dates, amounts, the team and project settings. A backup file of what is removed downloads to this device first.</p>
+      <label class="small" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:14px"><span>Type <b>RESET</b> to confirm</span><input class="field" id="rs_word" autocomplete="off" style="max-width:240px"></label>
+      <div class="row-actions"><button class="btn danger" type="button" id="rs_go" disabled>Reset status data</button><button class="btn" type="button" data-close>Cancel</button><span class="small muted" id="rs_msg"></span></div></div>`;
+  dlg.showModal();
+  const go = $('#rs_go'), word = $('#rs_word'), msg = $('#rs_msg');
+  word.focus();
+  word.oninput = () => { go.disabled = word.value.trim().toUpperCase() !== 'RESET'; };
+  dlg.querySelectorAll('[data-close]').forEach(b => b.onclick = () => dlg.close());
+  go.onclick = async () => {
+    go.disabled = true; word.disabled = true; msg.textContent = 'Saving a backup…';
+    try {
+      const backup = await store.statusBackup();
+      saveBlob(`status-backup-${todayISO()}.json`, new Blob([JSON.stringify({ project: projectName(), savedAt: new Date().toISOString(), by: state.user.email, ...backup })], { type: 'application/json' }));
+      msg.textContent = 'Resetting…';
+      await store.resetStatus(backup);
+      dlg.close(); toast('Status data reset. Every item is back to Not Started.');
+    } catch (err) { console.error(err); msg.textContent = 'Could not finish the reset. Check your connection and try again. Only Owners can do this.'; go.disabled = false; word.disabled = false; }
+  };
+}
 function removeBlock(m) {
   const email = m.email;
   if (m.role === 'owner' && !state.members.some(x => x.role === 'owner' && x.email !== email)) return 'This is the only Owner. Make someone else an Owner first, then remove this person.';
