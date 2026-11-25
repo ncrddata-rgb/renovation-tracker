@@ -408,7 +408,6 @@ function renderShare() {
       <div class="avatar">${initials(m.name || m.email)}</div>
       <div class="who-txt"><div><b>${esc(m.name || m.email.split('@')[0])}</b>${m.email === state.user.email ? ' <span class="muted small">(you)</span>' : ''}${m.disabled ? ' <span class="pill s-late">Disabled</span>' : ''}</div><div class="small muted">${esc(m.email)}</div></div>
       <select class="field" data-sh-role="${esc(m.email)}" aria-label="Role for ${esc(m.name || m.email)}">${ROLES.map(r => `<option value="${r.id}" ${r.id === m.role ? 'selected' : ''}>${r.label}</option>`).join('')}</select>
-      <button class="icon-btn" type="button" data-sh-invite="${esc(m.email)}" title="Send the invite to ${esc(m.email)}" aria-label="Send invite">${ICON.mail}</button>
       <button class="icon-btn" type="button" data-sh-remove="${esc(m.email)}" title="Remove access" aria-label="Remove ${esc(m.name || m.email)}">${ICON.x}</button></div>`).join('')}</div>
     <div class="sh-sec" style="border-bottom:0"><div class="sh-actions">
       <a class="btn" href="${esc(waLink(inviteText()))}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>
