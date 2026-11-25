@@ -153,6 +153,7 @@ button.kpi:hover { border-color: var(--muted); }
   body { background: #fff !important; }
   .panel, .kpi { break-inside: avoid; box-shadow: none !important; }
   .rp-grid { display: block; } .rp-grid .rp-sec { margin-bottom: 12px; }
+  .dsec-body[hidden] { display: block !important; }
 }
 
 .money-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit; color: inherit; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-width: 0; }
@@ -748,11 +749,7 @@ function viewDashboard(main) {
   main.querySelectorAll('[data-filter-status]').forEach(b => b.onclick = () => setFilters({ status: b.dataset.filterStatus }));
   main.querySelector('[data-filter-late]').onclick = () => setFilters({ late: true });
   $('#dueDays', main).onchange = e => { lsSet('reno-due-days', Number(e.target.value)); render(); };
-  main.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
-    const h = hiddenSecs(), id = b.dataset.hide; h[id] = !h[id]; lsSet('reno-hidden-secs', h);
-    const body = b.closest('.dsec-head').nextElementSibling; body.hidden = !!h[id];
-    b.textContent = h[id] ? 'Show' : 'Hide'; b.setAttribute('aria-expanded', String(!h[id]));
-  });
+  wireHide(main);
   main.querySelectorAll('[data-money]').forEach(b => b.onclick = () => moneyDialog(b.dataset.money));
   main.querySelectorAll('[data-filter-aspect]').forEach(b => b.onclick = () => setFilters({ aspect: b.dataset.filterAspect }));
 }
@@ -1156,6 +1153,13 @@ async function loadPhotos(itemId) {
 const hiddenSecs = () => lsGet('reno-hidden-secs') || {};
 const secHidden = id => hiddenSecs()[id] ? 'hidden' : '';
 const hideBtn = id => `<button type="button" class="btn sm ghost hide-btn" data-hide="${id}" aria-expanded="${!hiddenSecs()[id]}">${hiddenSecs()[id] ? 'Show' : 'Hide'}</button>`;
+function wireHide(root) {
+  root.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
+    const h = hiddenSecs(), id = b.dataset.hide; h[id] = !h[id]; lsSet('reno-hidden-secs', h);
+    const body = b.closest('.dsec-head').nextElementSibling; body.hidden = !!h[id];
+    b.textContent = h[id] ? 'Show' : 'Hide'; b.setAttribute('aria-expanded', String(!h[id]));
+  });
+}
 const secHead = (id, title, style = '') => `<div class="dsec-head" style="${style}">${title.replace('<h2>', '<h2 style="margin:0">')}${hideBtn(id)}</div>`;
 
 /* ---------- report downloads ---------- */
@@ -1275,7 +1279,7 @@ async function viewReports(main) {
   if (!document.body.contains(main) || currentView() !== 'reports') return;
   const R = buildReport(r, log);
   $('#rpBody', main).innerHTML = reportHtml(R, weekly);
-  wireCommon($('#rpBody', main));
+  wireCommon($('#rpBody', main)); wireHide($('#rpBody', main));
   ['#rpPdf', '#rpXlsx', '#rpCopy'].forEach(id => { $(id, main).disabled = false; });
   $('#rpPdf', main).onclick = () => downloadReportPdf(R, weekly);
   $('#rpXlsx', main).onclick = () => downloadReportExcel(R, weekly);
@@ -1314,7 +1318,7 @@ function buildReport(r, log) {
 function reportHtml(R, weekly) {
   const who = e => e ? esc(memberName(e)) : '<span class="muted">No contact</span>';
   const line = (i, right = '') => `<div class="list-row" data-open="${esc(i.id)}">${th(i.id)}<div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))} · Responsible: ${who(i.contact)}</span></div><span class="small" style="text-align:right">${right}</span></div>`;
-  const sec = (title, n, body, empty) => `<section class="panel rp-sec"><div class="dsec-head"><h2 style="margin:0">${title} <span class="muted small">(${n})</span></h2></div>${n ? body : `<p class="small muted">${empty}</p>`}</section>`;
+  const sec = (id, title, n, body, empty) => `<section class="panel rp-sec">${secHead('rp-' + id, `<h2>${title} <span class="muted small">(${n})</span></h2>`)}<div class="dsec-body" ${secHidden('rp-' + id)}>${n ? body : `<p class="small muted">${empty}</p>`}</div></section>`;
   const lastNote = id => { const n = [...R.notes].reverse().find(c => c.itemId === id); return n ? `<div class="small rp-note">“${esc(n.text.slice(0, 140))}” · ${esc(memberName(n.by))}</div>` : ''; };
   const days = Object.entries(R.perDay), maxDay = Math.max(1, ...days.map(([, v]) => v));
   return `<div class="rp-title"><h2>${weekly ? 'Weekly' : 'Daily'} progress report</h2><p class="muted">${esc(R.r.label)} · ${esc(projectName())}</p></div>
@@ -1326,19 +1330,19 @@ function reportHtml(R, weekly) {
     <div class="kpi"><div class="label">Overdue</div><div class="value num" style="color:${R.overdue.length ? 'var(--late)' : 'inherit'}">${R.overdue.length}</div><div class="sub">past planned end</div></div>
     <div class="kpi"><div class="label">Overall progress</div><div class="value num">${R.pct}%</div><div class="bar"><i style="width:${R.pct}%"></i></div></div>
   </div>
-  ${weekly ? `<section class="panel rp-sec"><div class="dsec-head"><h2 style="margin:0">Completed per day</h2></div><div class="rp-days">${days.map(([d, v]) => `<div><div class="rp-bar"><i style="height:${Math.round(v / maxDay * 100)}%"></i></div><b class="num">${v}</b><span class="small muted">${new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}</span></div>`).join('')}</div></section>` : ''}
+  ${weekly ? `<section class="panel rp-sec">${secHead('rp-perday', '<h2>Completed per day</h2>')}<div class="dsec-body" ${secHidden('rp-perday')}><div class="rp-days">${days.map(([d, v]) => `<div><div class="rp-bar"><i style="height:${Math.round(v / maxDay * 100)}%"></i></div><b class="num">${v}</b><span class="small muted">${new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}</span></div>`).join('')}</div></div></section>` : ''}
   <div class="rp-grid">
-  ${sec('✅ Completed', R.completed.length, R.completed.map(c => line(c.it, `Completed${c.by ? ' by ' + esc(memberName(c.by)) : ''}<br><span class="muted">${fmtDate(new Date(c.at - new Date(c.at).getTimezoneOffset() * 6e4).toISOString().slice(0, 10))}</span>`)).join(''), `Nothing was marked completed ${weekly ? 'this week' : 'on this day'}.`)}
-  ${sec('🔄 Work in progress', R.inProgress.length, R.inProgress.sort((a, b) => (Number(b.progress) || 0) - (Number(a.progress) || 0)).map(i => { const m = R.moved.find(x => x.it.id === i.id); return line(i, `<b class="num">${Number(i.progress) || 0}%</b>${m ? `<br><span style="color:var(--done)">+${m.to - m.from}% ${weekly ? 'this week' : 'today'}</span>` : i.plannedEnd ? `<br><span class="muted">Due ${fmtDate(i.plannedEnd)}</span>` : ''}`); }).join(''), 'No work is in progress right now.')}
-  ${sec('⏸️ On hold', R.onHold.length, R.onHold.map(i => line(i, i.plannedEnd ? `Due ${fmtDate(i.plannedEnd)}` : '') + lastNote(i.id)).join(''), 'Nothing is on hold.')}
-  ${sec('⚠️ Challenges and delays', R.overdue.length, R.overdue.map(i => line(i, `<span style="color:var(--late)">${dayNum(todayISO()) - dayNum(i.plannedEnd)} days late</span><br><span class="muted">was due ${fmtDate(i.plannedEnd)}</span>`) + lastNote(i.id)).join(''), 'No item is overdue.')}
-  ${sec('🕒 Pending, due to start soon', R.pendingDue.length, R.pendingDue.map(i => line(i, i.plannedStart ? `Start ${fmtDate(i.plannedStart)}` : `Due ${fmtDate(i.plannedEnd)}`)).join('') + `<p class="small muted" style="margin-top:8px">${R.pending.length - R.pendingDue.length} other items are not started and have no date in the next week.</p>`, `${R.pending.length} items are not started; none are due to start in the next week.`)}
-  ${sec('💬 Notes and updates from the team', R.notes.length, R.notes.map(c => `<div class="list-row" data-open="${esc(c.itemId)}"><div class="t"><b>${esc(state.items.find(i => i.id === c.itemId).title)}</b><div class="small">“${esc(c.text)}”</div><div class="small muted">${esc(memberName(c.by))} · ${new Date(c.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</div></div></div>`).join(''), `No comments were posted ${weekly ? 'this week' : 'on this day'}.`)}
+  ${sec('done', '✅ Completed', R.completed.length, R.completed.map(c => line(c.it, `Completed${c.by ? ' by ' + esc(memberName(c.by)) : ''}<br><span class="muted">${fmtDate(new Date(c.at - new Date(c.at).getTimezoneOffset() * 6e4).toISOString().slice(0, 10))}</span>`)).join(''), `Nothing was marked completed ${weekly ? 'this week' : 'on this day'}.`)}
+  ${sec('progress', '🔄 Work in progress', R.inProgress.length, R.inProgress.sort((a, b) => (Number(b.progress) || 0) - (Number(a.progress) || 0)).map(i => { const m = R.moved.find(x => x.it.id === i.id); return line(i, `<b class="num">${Number(i.progress) || 0}%</b>${m ? `<br><span style="color:var(--done)">+${m.to - m.from}% ${weekly ? 'this week' : 'today'}</span>` : i.plannedEnd ? `<br><span class="muted">Due ${fmtDate(i.plannedEnd)}</span>` : ''}`); }).join(''), 'No work is in progress right now.')}
+  ${sec('hold', '⏸️ On hold', R.onHold.length, R.onHold.map(i => line(i, i.plannedEnd ? `Due ${fmtDate(i.plannedEnd)}` : '') + lastNote(i.id)).join(''), 'Nothing is on hold.')}
+  ${sec('late', '⚠️ Challenges and delays', R.overdue.length, R.overdue.map(i => line(i, `<span style="color:var(--late)">${dayNum(todayISO()) - dayNum(i.plannedEnd)} days late</span><br><span class="muted">was due ${fmtDate(i.plannedEnd)}</span>`) + lastNote(i.id)).join(''), 'No item is overdue.')}
+  ${sec('pending', '🕒 Pending, due to start soon', R.pendingDue.length, R.pendingDue.map(i => line(i, i.plannedStart ? `Start ${fmtDate(i.plannedStart)}` : `Due ${fmtDate(i.plannedEnd)}`)).join('') + `<p class="small muted" style="margin-top:8px">${R.pending.length - R.pendingDue.length} other items are not started and have no date in the next week.</p>`, `${R.pending.length} items are not started; none are due to start in the next week.`)}
+  ${sec('notes', '💬 Notes and updates from the team', R.notes.length, R.notes.map(c => `<div class="list-row" data-open="${esc(c.itemId)}"><div class="t"><b>${esc(state.items.find(i => i.id === c.itemId).title)}</b><div class="small">“${esc(c.text)}”</div><div class="small muted">${esc(memberName(c.by))} · ${new Date(c.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</div></div></div>`).join(''), `No comments were posted ${weekly ? 'this week' : 'on this day'}.`)}
   </div>
-  <section class="panel rp-sec"><div class="dsec-head"><h2 style="margin:0">👥 Accountability by person</h2></div>
+  <section class="panel rp-sec">${secHead('rp-people', '<h2>👥 Accountability by person</h2>')}<div class="dsec-body" ${secHidden('rp-people')}>
     <div class="tbl-wrap"><table><thead><tr><th>Person</th><th class="num">Completed ${weekly ? 'this week' : 'today'}</th><th class="num">Updates made</th><th class="num">In progress</th><th class="num">On hold</th><th class="num">Overdue</th><th class="num">Open items</th></tr></thead><tbody>
     ${R.people.map(p => `<tr><td>${p.email ? `<b>${esc(memberName(p.email))}</b>` : '<span class="muted">No contact assigned</span>'}</td><td class="num">${p.done}</td><td class="num">${p.updates}</td><td class="num">${p.prog}</td><td class="num">${p.hold}</td><td class="num" style="${p.late ? 'color:var(--late);font-weight:600' : ''}">${p.late}</td><td class="num">${p.open}</td></tr>`).join('')}
-    </tbody></table></div><p class="small muted">"Updates made" counts items where someone recorded a change or comment in this period, grouped by the person responsible for the item.</p></section>
+    </tbody></table></div><p class="small muted">"Updates made" counts items where someone recorded a change or comment in this period, grouped by the person responsible for the item.</p></div></section>
   <p class="small muted">In progress, On hold, Pending and Overdue show each item's status today. Completed, progress moved and notes are for the period shown.</p>`;
 }
 function reportText(R, weekly) {
