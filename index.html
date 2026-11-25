@@ -165,6 +165,10 @@ button.kpi:hover { border-color: var(--muted); }
 .item-row:hover { background: var(--sunken); }
 .item-row .title { cursor: pointer; min-width: 0; }
 .item-row .title b { font-weight: 500; }
+.ithumb { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); flex: none; display: block; background: var(--sunken); }
+.ithumb.inl { display: inline-block; width: 32px; height: 32px; vertical-align: middle; margin-left: 10px; }
+.ithumb.card-th { float: right; width: 36px; height: 36px; margin: 0 0 4px 8px; }
+.ithumb.tiny { display: inline-block; width: 18px; height: 18px; border-radius: 4px; vertical-align: middle; margin-right: 6px; }
 .item-row .meta { font-size: 12px; color: var(--muted); }
 tr.is-off td { color: var(--muted); }
 .seg { display: inline-flex; }
@@ -441,6 +445,7 @@ function statusPill(it) { const s = ST[it.status] || ST.planned; return `<span c
 
 /* ---------- state ---------- */
 const state = {
+  thumbs: {}, thumbMeta: {}, thumbsOk: null,
   user: null, me: null, members: [], aspects: [], items: [], settings: {},
   filters: Object.assign({ q: '', status: '', aspect: '', floor: '', trade: '', contact: '', role: '', mine: false, late: false }, lsGet('reno-filters') || {}),
   ready: false
@@ -464,7 +469,8 @@ function DemoStore() {
   let db = lsGet(KEY);
   let listener = () => {};
   const persist = () => { lsSet(KEY, db); listener(snapshot()); };
-  const snapshot = () => ({ members: db.members, aspects: db.aspects, items: db.items, settings: db.settings });
+  const demoThumbs = () => { const t = {}; [...(db.photos || [])].sort((a, b) => a.at - b.at).forEach(p => { t[p.itemId] = p.thumb || p.data; }); return t; };
+  const snapshot = () => ({ members: db.members, aspects: db.aspects, items: db.items, settings: db.settings, thumbs: demoThumbs() });
   function fresh() {
     const S = window.SEED || { aspects: [], items: [] };
     const examples = { 'a01-01': ['done', 100], 'a01-02': ['done', 100], 'a01-03': ['progress', 60], 'a02-01': ['done', 100], 'a02-02': ['progress', 40], 'a04-01': ['progress', 30], 'a18-01': ['done', 100], 'a10-01': ['hold', 0] };
@@ -506,8 +512,9 @@ function DemoStore() {
     async addComment(c) { db.comments.push({ id: uid(), ...c, at: Date.now() }); if (!lsSet(KEY, db)) {} },
     async photos(itemId) { return db.photos.filter(p => p.itemId === itemId); },
     async allPhotos() { return [...db.photos]; },
-    async addPhoto(p) { db.photos.push({ id: uid(), ...p, at: Date.now() }); if (!lsSet(KEY, db)) toast('Photo kept for this visit only: browser storage is full'); },
-    async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); },
+    async addPhoto(p) { const id = uid(); db.photos.push({ id, ...p, at: Date.now() }); if (!lsSet(KEY, db)) toast('Photo kept for this visit only: browser storage is full'); state.thumbs = demoThumbs(); thumbsChanged(); return id; },
+    async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); state.thumbs = demoThumbs(); thumbsChanged(); },
+    async setThumb() {}, async clearThumb() {},
     async seed() {},
     async signOut() {},
     reset() { db = fresh(); state.user.email = 'demo.owner@example.com'; persist(); }
@@ -555,6 +562,12 @@ async function FirebaseStore() {
       unsubs.push(fs.onSnapshot(col('aspects'), s => { snap.aspects = s.docs.map(d => ({ id: d.id, ...d.data() })); fire(); }, err));
       unsubs.push(fs.onSnapshot(col('items'), s => { snap.items = s.docs.map(d => ({ id: d.id, ...d.data() })); fire(); }, err));
       unsubs.push(fs.onSnapshot(fs.doc(db, 'settings', 'main'), s => { snap.settings = s.exists() ? s.data() : {}; fire(); }, err));
+      // Small photo thumbnails, one per item. Optional: if the database rules do not allow them yet, the app works without.
+      unsubs.push(fs.onSnapshot(col('thumbs'), s => {
+        state.thumbsOk = true; state.thumbs = Object.fromEntries(s.docs.map(d => [d.id, d.data().data]));
+        state.thumbMeta = Object.fromEntries(s.docs.map(d => [d.id, d.data().photoId]));
+        thumbsChanged();
+      }, e => { state.thumbsOk = false; console.warn('Thumbnails unavailable:', e.code || e); }));
     },
     async saveItem(id, data) {
       if (id) { await fs.updateDoc(fs.doc(db, 'items', id), { ...data, ...stamp() }); return id; }
@@ -579,8 +592,10 @@ async function FirebaseStore() {
       const s = await fs.getDocs(col('photos'));
       return s.docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : Date.now() }; });
     },
-    async addPhoto(p) { await fs.addDoc(col('photos'), { ...p, at: fs.serverTimestamp() }); },
+    async addPhoto(p) { const r = await fs.addDoc(col('photos'), { ...p, at: fs.serverTimestamp() }); return r.id; },
     async deletePhoto(id) { await fs.deleteDoc(fs.doc(db, 'photos', id)); },
+    async setThumb(itemId, data, photoId) { await fs.setDoc(fs.doc(db, 'thumbs', itemId), { data, photoId, by: state.user.email, at: fs.serverTimestamp() }); },
+    async clearThumb(itemId) { await fs.deleteDoc(fs.doc(db, 'thumbs', itemId)); },
     async seed(S) {
       const b = fs.writeBatch(db);
       S.aspects.forEach(a => b.set(fs.doc(db, 'aspects', a.id), { name: a.name, floor: a.floor, order: a.order, notes: '' }));
@@ -689,7 +704,7 @@ function viewDashboard(main) {
   const undated = items.filter(i => i.status !== 'done' && !i.plannedEnd).length;
   const pct = avgProgress(items);
 
-  const row = i => `<div class="list-row" data-open="${esc(i.id)}"><div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.contact ? ' · ' + esc(memberName(i.contact)) : ''}</span></div><span class="small num ${isLate(i) ? '' : 'muted'}" style="${isLate(i) ? 'color:var(--late)' : ''}">${fmtDate(i.plannedEnd)}</span>${statusPill(i)}</div>`;
+  const row = i => `<div class="list-row" data-open="${esc(i.id)}">${th(i.id)}<div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.contact ? ' · ' + esc(memberName(i.contact)) : ''}</span></div><span class="small num ${isLate(i) ? '' : 'muted'}" style="${isLate(i) ? 'color:var(--late)' : ''}">${fmtDate(i.plannedEnd)}</span>${statusPill(i)}</div>`;
 
   main.innerHTML = `
     <div class="section-head"><div><h1>Where the renovation stands</h1><p>${items.length} items across ${state.aspects.length} aspects · today ${fmtDateY(today)}</p></div>
@@ -803,7 +818,7 @@ function viewItems(main) {
           <span style="margin-left:auto"></span>${can.editAll() && a.id ? `<button class="btn sm ghost" data-add-item="${esc(a.id)}">+ Item</button>` : ''}</div>
         ${its.map(i => `<div class="item-row">
           <div>${statusSelect(i)}</div>
-          <div class="title" data-open="${esc(i.id)}"><b>${esc(i.title)}</b><div class="meta">${i.trade ? `<span class="tag">${esc(i.trade)}</span>` : ''}${i.floor ? `<span class="tag">${esc(i.floor)}</span>` : ''}${i.priority === 'High' ? '<span class="tag" style="color:var(--late)">High priority</span>' : ''}${i.nextSteps ? esc(i.nextSteps.slice(0, 90)) + (i.nextSteps.length > 90 ? '…' : '') : ''}</div></div>
+          <div class="title" data-open="${esc(i.id)}"><b>${esc(i.title)}</b>${th(i.id, 'inl')}<div class="meta">${i.trade ? `<span class="tag">${esc(i.trade)}</span>` : ''}${i.floor ? `<span class="tag">${esc(i.floor)}</span>` : ''}${i.priority === 'High' ? '<span class="tag" style="color:var(--late)">High priority</span>' : ''}${i.nextSteps ? esc(i.nextSteps.slice(0, 90)) + (i.nextSteps.length > 90 ? '…' : '') : ''}</div></div>
           <div class="c-contact small">${i.contact ? esc(memberName(i.contact)) : '<span class="muted">No contact</span>'}</div>
           <div class="c-dates small num">${i.plannedEnd ? `<span style="${isLate(i) ? 'color:var(--late);font-weight:600' : ''}">Due ${fmtDate(i.plannedEnd)}</span>` : '<span class="muted">No date</span>'}${i.estimate ? `<br><span class="muted">${inrShort(i.actualSpent || 0)} / ${inrShort(i.estimate)}</span>` : ''}</div>
           <div class="c-prog"><div class="bar"><i style="width:${i.status === 'done' ? 100 : Number(i.progress) || 0}%"></i></div><span class="small muted num">${i.status === 'done' ? 100 : Number(i.progress) || 0}%</span></div>
@@ -840,7 +855,7 @@ function viewBoard(main) {
   main.innerHTML = `<div class="section-head"><div><h1>Board</h1><p>${can.editProgress() ? 'Drag a card to another column, or change its status on the card.' : 'Items by status.'}</p></div></div>
     ${filterBar()}
     <div class="board">${STATUSES.map(s => { const its = list.filter(i => (i.status || 'planned') === s.id); return `<div class="col" data-col="${s.id}"><h2><span>${s.label}</span><span class="muted num">${its.length}</span></h2>
-      ${its.map(i => `<div class="card" draggable="${can.editProgress()}" data-id="${esc(i.id)}" data-open="${esc(i.id)}"><b>${esc(i.title)}</b><div class="meta">${esc(aspectName(i.aspectId))}${i.contact ? ' · ' + esc(memberName(i.contact)) : ''}${i.plannedEnd ? ` · <span style="${isLate(i) ? 'color:var(--late)' : ''}">due ${fmtDate(i.plannedEnd)}</span>` : ''}</div>
+      ${its.map(i => `<div class="card" draggable="${can.editProgress()}" data-id="${esc(i.id)}" data-open="${esc(i.id)}">${th(i.id, 'card-th')}<b>${esc(i.title)}</b><div class="meta">${esc(aspectName(i.aspectId))}${i.contact ? ' · ' + esc(memberName(i.contact)) : ''}${i.plannedEnd ? ` · <span style="${isLate(i) ? 'color:var(--late)' : ''}">due ${fmtDate(i.plannedEnd)}</span>` : ''}</div>
         <div class="bar"><i style="width:${i.status === 'done' ? 100 : Number(i.progress) || 0}%"></i></div></div>`).join('')}</div>`; }).join('')}</div>`;
   wireCommon(main); wireFilters(main, () => viewBoard(main));
   if (!can.editProgress()) return;
@@ -864,7 +879,7 @@ function viewTimeline(main) {
   if (span <= 120) { let n = lo + ((4 - (lo % 7)) + 7) % 7; while (n < hi) { ticks.push([n, fmtDate(isoFromNum(n))]); n += 7; } } // weekly, on Mondays
   else { const d = new Date(lo * 864e5); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + 1); while (d.getTime() / 864e5 < hi) { ticks.push([Math.round(d.getTime() / 864e5), `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`]); d.setUTCMonth(d.getUTCMonth() + 1); } }
   const undated = state.items.length - dated.length;
-  const rows = sortedAspects().map(a => { const its = itemsOf(a.id).filter(i => i.plannedStart || i.plannedEnd); if (!its.length) return ''; return `<div class="tl-row grp"><div class="tl-name">${esc(a.name)}</div><div class="tl-track"></div></div>` + its.map(i => { const s = dayNum(i.plannedStart || i.plannedEnd), e = dayNum(i.plannedEnd || i.plannedStart); const st = ST[i.status] || ST.planned; const col = isLate(i) ? 'var(--late)' : st.color; return `<div class="tl-row"><div class="tl-name" data-open="${esc(i.id)}" title="${esc(i.title)}">${esc(i.title)}</div><div class="tl-track"><div class="tl-bar" data-open="${esc(i.id)}" title="${esc(i.title)}: ${fmtDate(i.plannedStart)} to ${fmtDate(i.plannedEnd)}" style="left:${X(s)};width:max(6px, calc(${X(e + 1)} - ${X(s)}));background:${col}"></div></div></div>`; }).join(''); }).join('');
+  const rows = sortedAspects().map(a => { const its = itemsOf(a.id).filter(i => i.plannedStart || i.plannedEnd); if (!its.length) return ''; return `<div class="tl-row grp"><div class="tl-name">${esc(a.name)}</div><div class="tl-track"></div></div>` + its.map(i => { const s = dayNum(i.plannedStart || i.plannedEnd), e = dayNum(i.plannedEnd || i.plannedStart); const st = ST[i.status] || ST.planned; const col = isLate(i) ? 'var(--late)' : st.color; return `<div class="tl-row"><div class="tl-name" data-open="${esc(i.id)}" title="${esc(i.title)}">${th(i.id, 'tiny')}${esc(i.title)}</div><div class="tl-track"><div class="tl-bar" data-open="${esc(i.id)}" title="${esc(i.title)}: ${fmtDate(i.plannedStart)} to ${fmtDate(i.plannedEnd)}" style="left:${X(s)};width:max(6px, calc(${X(e + 1)} - ${X(s)}));background:${col}"></div></div></div>`; }).join(''); }).join('');
   main.innerHTML = `<div class="section-head"><div><h1>Timeline</h1><p>Planned start to planned end for each dated item. Blue line is today, red dashed line is the ${fmtDate(deadline())} hand-over.</p></div></div>
     <div class="legend">${STATUSES.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}<span><i style="background:var(--late)"></i>Overdue</span></div>
     ${dated.length ? `<div class="tl-wrap"><div class="tl">
@@ -1113,9 +1128,9 @@ async function loadPhotos(itemId) {
       const files = [...e.target.files]; if (!files.length) return;
       toast('Uploading…');
       for (const file of files) { try { const data = await shrink(file); await store.addPhoto({ itemId, kind, data, by: state.user.email }); } catch (err) { console.error(err); toast('A photo could not be uploaded'); } }
-      loadPhotos(itemId); toast('Photo added');
+      loadPhotos(itemId); toast('Photo added'); refreshThumb(itemId);
     };
-    el.querySelectorAll('[data-delphoto]').forEach(b => b.onclick = async () => { await store.deletePhoto(b.dataset.delphoto); loadPhotos(itemId); });
+    el.querySelectorAll('[data-delphoto]').forEach(b => b.onclick = async () => { await store.deletePhoto(b.dataset.delphoto); loadPhotos(itemId); refreshThumb(itemId); });
     el.querySelectorAll('img').forEach(img => img.onclick = () => { const w = window.open(); if (w) { w.document.write(`<img src="${img.src}" style="max-width:100%">`); } });
   });
 }
@@ -1134,7 +1149,7 @@ function moneyDialog(kind) {
   const key = kind === 'spent' ? 'actualSpent' : 'estimate';
   const title = { estimate: 'Estimated cost', spent: 'Spent so far', budget: 'Budget' }[kind];
   const rowsFor = k => items.filter(i => Number(i[k])).sort((a, b) => Number(b[k]) - Number(a[k]));
-  const itemRow = i => `<div class="list-row" data-money-open="${esc(i.id)}"><div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.updatedBy ? ' · last changed by ' + esc(memberName(i.updatedBy)) : ''}</span></div><span class="small num" style="text-align:right">${i.estimate ? 'Est. ' + inr(i.estimate) : ''}${i.estimate && i.actualSpent ? '<br>' : ''}${i.actualSpent ? 'Spent ' + inr(i.actualSpent) : ''}</span></div>`;
+  const itemRow = i => `<div class="list-row" data-money-open="${esc(i.id)}">${th(i.id)}<div class="t"><b>${esc(i.title)}</b><span class="small muted">${esc(aspectName(i.aspectId))}${i.updatedBy ? ' · last changed by ' + esc(memberName(i.updatedBy)) : ''}</span></div><span class="small num" style="text-align:right">${i.estimate ? 'Est. ' + inr(i.estimate) : ''}${i.estimate && i.actualSpent ? '<br>' : ''}${i.actualSpent ? 'Spent ' + inr(i.actualSpent) : ''}</span></div>`;
   let body;
   if (kind === 'budget') {
     const byAspect = sortedAspects().map(a => { const its = items.filter(i => i.aspectId === a.id); return { a, e: its.reduce((s, i) => s + (Number(i.estimate) || 0), 0), sp: its.reduce((s, i) => s + (Number(i.actualSpent) || 0), 0) }; }).filter(x => x.e || x.sp);
@@ -1208,10 +1223,11 @@ async function viewPhotos(main) {
     if (!files.length) return;
     let ok = 0; msg.textContent = 'Uploading…';
     for (const file of files) { try { const data = await shrink(file); await store.addPhoto({ itemId, kind, data, by: state.user.email }); ok++; } catch (err) { console.error(err); } }
+    refreshThumb(itemId);
     msg.textContent = ok === files.length ? `${ok} photo${ok === 1 ? '' : 's'} added.` : `${ok} of ${files.length} photos added. The rest could not be uploaded.`;
     await loadAll(); draw();
   };
-  const loadAll = async () => { try { photoCache = await store.allPhotos(); } catch (err) { console.error(err); photoCache = []; list.innerHTML = '<p class="muted" style="margin-top:24px">Photos could not be loaded. Check your connection and refresh.</p>'; return; } };
+  const loadAll = async () => { try { photoCache = await store.allPhotos(); backfillThumbs(photoCache); } catch (err) { console.error(err); photoCache = []; list.innerHTML = '<p class="muted" style="margin-top:24px">Photos could not be loaded. Check your connection and refresh.</p>'; return; } };
   if (photoCache) draw();
   await loadAll(); if (currentView() === 'photos' && document.body.contains(list)) draw();
 }
@@ -1230,9 +1246,34 @@ function showPhoto(p, after) {
   const del = $('#ph_del');
   if (del) del.onclick = async () => {
     if (del.dataset.sure !== '1') { del.dataset.sure = '1'; del.textContent = 'Yes, delete'; $('#ph_msg').textContent = 'This photo will be deleted permanently.'; return; }
-    try { await store.deletePhoto(p.id); photoCache = (photoCache || []).filter(x => x.id !== p.id); dlg.close(); toast('Photo deleted'); after && after(); }
+    try { await store.deletePhoto(p.id); photoCache = (photoCache || []).filter(x => x.id !== p.id); dlg.close(); toast('Photo deleted'); refreshThumb(p.itemId, photoCache.filter(x => x.itemId === p.itemId)); after && after(); }
     catch (err) { console.error(err); $('#ph_msg').textContent = 'Could not delete this photo.'; }
   };
+}
+/* ---------- item thumbnails ---------- */
+// Redraw for new thumbnails, but never under someone filling in the Photos page form
+function thumbsChanged() { if (state.ready && currentView() !== 'photos') render(); }
+const th = (id, cls = '') => { const d = state.thumbs && state.thumbs[id]; return d ? `<img class="ithumb ${cls}" src="${esc(d)}" alt="" loading="lazy">` : ''; };
+function backfillThumbs(all) {
+  if (store.mode !== 'live' || !state.thumbsOk) return;
+  const by = {}; all.forEach(p => (by[p.itemId] = by[p.itemId] || []).push(p));
+  Object.entries(by).forEach(([id, ps]) => { if (!state.thumbMeta || !state.thumbMeta[id]) refreshThumb(id, ps); });
+}
+function makeThumb(dataUrl) {
+  return new Promise(res => { const img = new Image(); img.onload = () => { const n = 96, c = document.createElement('canvas'); c.width = c.height = n;
+    const s = Math.min(img.width, img.height); c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, n, n);
+    res(c.toDataURL('image/jpeg', 0.7)); }; img.onerror = () => res(''); img.src = dataUrl; });
+}
+// Keep an item's thumbnail in step with its newest photo
+async function refreshThumb(itemId, known) {
+  if (store.mode !== 'live' || state.thumbsOk === false) return;
+  try {
+    const ps = known || await store.photos(itemId);
+    const latest = [...ps].sort((a, b) => b.at - a.at)[0];
+    if (!latest) { if (state.thumbs && state.thumbs[itemId]) await store.clearThumb(itemId); return; }
+    if (state.thumbMeta && state.thumbMeta[itemId] === latest.id) return;
+    const t = await makeThumb(latest.data); if (t) await store.setThumb(itemId, t, latest.id);
+  } catch (e) { console.warn('Thumbnail not saved', e.code || e); }
 }
 function shrink(file) {
   return new Promise((res, rej) => {
