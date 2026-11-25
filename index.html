@@ -540,6 +540,7 @@ function DemoStore() {
     async addPhoto(p) { const id = uid(); db.photos.push({ id, ...p, at: Date.now() }); if (!lsSet(KEY, db)) toast('Photo kept for this visit only: browser storage is full'); state.thumbs = demoThumbs(); thumbsChanged(); return id; },
     async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); state.thumbs = demoThumbs(); thumbsChanged(); },
     async setThumb() {}, async clearThumb() {},
+    async fullExport() { return { aspects: [...db.aspects], items: [...db.items], members: [...db.members], settings: { ...db.settings }, comments: [...db.comments], photos: [...db.photos] }; },
     async statusBackup() { return { items: db.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact })), comments: [...db.comments], photos: [...db.photos] }; },
     async resetStatus() {
       db.items.forEach(i => Object.assign(i, { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '' }));
@@ -646,6 +647,12 @@ async function FirebaseStore() {
     async deletePhoto(id) { await fs.deleteDoc(fs.doc(db, 'photos', id)); },
     async setThumb(itemId, data, photoId) { await fs.setDoc(fs.doc(db, 'thumbs', itemId), { data, photoId, by: state.user.email, at: fs.serverTimestamp() }); },
     async clearThumb(itemId) { await fs.deleteDoc(fs.doc(db, 'thumbs', itemId)); },
+    async fullExport() {
+      const plain = v => v && v.toMillis ? new Date(v.toMillis()).toISOString() : v;
+      const all = async name => (await fs.getDocs(col(name))).docs.map(d => Object.fromEntries([['id', d.id], ...Object.entries(d.data()).map(([k, v]) => [k, plain(v)])]));
+      const st = await fs.getDoc(fs.doc(db, 'settings', 'main'));
+      return { aspects: await all('aspects'), items: await all('items'), members: await all('members'), settings: st.exists() ? Object.fromEntries(Object.entries(st.data()).map(([k, v]) => [k, plain(v)])) : {}, comments: await all('comments'), photos: await all('photos') };
+    },
     async statusBackup() {
       const all = async name => (await fs.getDocs(col(name))).docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : x.at }; });
       return { items: state.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact })), comments: await all('comments'), photos: await all('photos') };
@@ -1019,6 +1026,9 @@ function viewTeam(main) {
       <label>Hand-over date<input class="field" type="date" id="s_deadline" value="${esc(deadline())}"></label>
       <label>Overall budget (₹)<input class="field num" type="number" min="0" step="1000" id="s_budget" value="${esc(state.settings.budget || '')}"></label>
       <div><button class="btn primary">Save settings</button></div></form></section>
+    <section class="panel" style="margin-top:16px;max-width:560px"><h2>Full backup</h2>
+      <p class="small muted" style="margin:4px 0 12px">Download a complete copy of the project as it is now: every aspect, item, team member, setting, update and photo. Changes nothing.</p>
+      <button class="btn" type="button" id="fullBackup">Download full backup</button> <span class="small muted" id="fb_msg"></span></section>
     <section class="panel danger-zone" style="margin-top:16px;max-width:560px"><h2>Reset status data</h2>
       <p class="small muted" style="margin:4px 0 12px">Start tracking afresh. Every item goes back to Not Started, 0%, unassigned, with no dates or amounts, and all progress updates, notes, change history and uploaded photos are removed for everyone. Aspects, items, categories, the team and these settings are kept. A backup file downloads first.</p>
       <button class="btn danger" type="button" id="resetStatus">Reset status data…</button></section>` : ''}
@@ -1044,6 +1054,11 @@ function viewTeam(main) {
   main.querySelectorAll('[data-contact]').forEach(b => b.onclick = () => setFilters({ contact: b.dataset.contact }));
   main.querySelectorAll('[data-invite]').forEach(b => b.onclick = () => shareInvite(b.dataset.invite));
   $('#resetStatus', main)?.addEventListener('click', confirmResetStatus);
+  $('#fullBackup', main)?.addEventListener('click', async () => {
+    const b = $('#fullBackup', main), m = $('#fb_msg', main); b.disabled = true; m.textContent = 'Preparing…';
+    try { await downloadFullBackup(); m.textContent = 'Downloaded.'; } catch (err) { console.error(err); m.textContent = 'Could not make the backup. Check your connection and try again.'; }
+    b.disabled = false;
+  });
   const sf = $('#sf', main);
   if (sf) sf.onsubmit = async e => { e.preventDefault(); try { await store.saveSettings({ projectName: $('#s_name').value.trim(), deadline: $('#s_deadline').value || '2026-12-25', budget: Number($('#s_budget').value) || 0 }); toast('Settings saved'); } catch { toast('Could not save settings'); } };
 }
@@ -1103,6 +1118,38 @@ async function downloadResetBackup(b) {
     const photos = b.photos.map(ph => ({ id: ph.id, item: itemName(ph.itemId), itemId: ph.itemId, kind: ph.kind || '', by: ph.by || '', at: ph.at ? new Date(ph.at).toISOString() : '', image: ph.data }));
     saveBlob(`photos-backup-${tag}.json`, new Blob([JSON.stringify({ project: projectName(), savedAt: now.toISOString(), photos }, null, 2)], { type: 'application/json' }));
   }
+}
+// Owner-only, read-only snapshot of the whole project: a readable Excel file plus a complete JSON file (with photos)
+async function downloadFullBackup() {
+  if (!can.members()) return;
+  const x = await store.fullExport();
+  await loadScript('vendor/xlsx.full.min.js');
+  const X = window.XLSX, wb = X.utils.book_new();
+  const now = new Date(), tag = `${todayISO()}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+  const ms = v => typeof v === 'number' ? v : v ? Date.parse(v) : 0;
+  const when = v => ms(v) ? new Date(ms(v)).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const asp = Object.fromEntries(x.aspects.map(a => [a.id, a]));
+  const it = Object.fromEntries(x.items.map(i => [i.id, i]));
+  const mem = Object.fromEntries(x.members.map(m => [m.id || m.email, m]));
+  const who = e => e ? (mem[e] && mem[e].name ? `${mem[e].name} (${e})` : e) : '';
+  const sheet = (name, rows, widths) => { const ws = X.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map(w => ({ wch: w })); X.utils.book_append_sheet(wb, ws, name); };
+  const aspects = [...x.aspects].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  sheet('Summary', [['Full backup', projectName()], ['Saved on', when(now.getTime())], ['Saved by', who(state.user.email)], [],
+    ['Aspects', x.aspects.length], ['Items', x.items.length], ['Team members', x.members.length], ['Updates and history', x.comments.length], ['Photos', x.photos.length], [],
+    ['Hand-over date', x.settings.deadline ? fmtDateY(x.settings.deadline) : ''], ['Overall budget (₹)', x.settings.budget || ''],
+    [], ['Note', 'The photos themselves, and every field exactly as stored, are in the matching full-backup .json file.']], [26, 80]);
+  sheet('Aspects', [['Order', 'Aspect', 'Floor', 'Notes', 'Items', 'Aspect ID'], ...aspects.map(a => [a.order ?? '', a.name || '', a.floor || '', a.notes || '', x.items.filter(i => i.aspectId === a.id).length, a.id])], [7, 28, 14, 40, 7, 12]);
+  const items = [...x.items].sort((a, b) => ((asp[a.aspectId] || {}).order ?? 999) - ((asp[b.aspectId] || {}).order ?? 999) || (a.order ?? 999) - (b.order ?? 999));
+  sheet('Items', [['Aspect', 'Item', 'Status', 'Progress %', 'Trade', 'Floor', 'Priority', 'Assigned to', 'Next steps', 'Days required', 'Planned start', 'Due date', 'Completed on', 'Estimate (₹)', 'Spent (₹)', 'Last changed by', 'Item ID'],
+    ...items.map(i => [(asp[i.aspectId] || {}).name || '', i.title || '', (ST[i.status] || ST.planned).label, Number(i.progress) || 0, i.trade || '', i.floor || '', i.priority || '', who(i.contact), i.nextSteps || '', i.daysRequired || '', i.plannedStart ? fmtDateY(i.plannedStart) : '', i.plannedEnd ? fmtDateY(i.plannedEnd) : '', i.actualDate ? fmtDateY(i.actualDate) : '', i.estimate === '' || i.estimate == null ? '' : Number(i.estimate), i.actualSpent === '' || i.actualSpent == null ? '' : Number(i.actualSpent), who(i.updatedBy), i.id])],
+    [24, 40, 12, 10, 12, 12, 9, 30, 40, 8, 13, 13, 13, 12, 12, 30, 12]);
+  sheet('Team', [['Name', 'Email', 'Role', 'Trade', 'Phone', 'Access'], ...x.members.map(m => [m.name || '', m.id || m.email, (ROLES.find(r => r.id === m.role) || {}).label || m.role || '', m.trade || '', m.phone || '', m.disabled ? 'Disabled' : 'Enabled'])], [24, 32, 12, 14, 16, 10]);
+  sheet('Updates and history', [['When', 'Aspect', 'Item', 'Type', 'By', 'Details'],
+    ...[...x.comments].sort((a, b) => ms(b.at) - ms(a.at)).map(c => [when(c.at), (asp[(it[c.itemId] || {}).aspectId] || {}).name || '', (it[c.itemId] || {}).title || '', c.kind === 'change' ? 'Change' : 'Note', who(c.by), c.text || ''])], [20, 22, 40, 10, 30, 70]);
+  sheet('Photos', [['When', 'Aspect', 'Item', 'Before / after', 'Uploaded by', 'Photo ID'],
+    ...[...x.photos].sort((a, b) => ms(b.at) - ms(a.at)).map(ph => [when(ph.at), (asp[(it[ph.itemId] || {}).aspectId] || {}).name || '', (it[ph.itemId] || {}).title || '', ph.kind || '', who(ph.by), ph.id])], [20, 22, 40, 12, 30, 24]);
+  saveBlob(`full-backup-${tag}.xlsx`, new Blob([X.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  saveBlob(`full-backup-${tag}.json`, new Blob([JSON.stringify({ project: projectName(), savedAt: now.toISOString(), savedBy: state.user.email, ...x }, null, 2)], { type: 'application/json' }));
 }
 function confirmResetStatus() {
   if (!can.members()) return;
