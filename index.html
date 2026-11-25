@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="app-build" content="20261125162535">
 </head>
 <body>
 <title>House Renovation App</title>
@@ -184,6 +185,7 @@ button.kpi:hover { border-color: var(--muted); }
 .item-row:hover { background: var(--sunken); }
 .item-row .title { cursor: pointer; min-width: 0; }
 .item-row .title b { font-weight: 500; }
+.upd-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 10px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.12); font-size: 14px; max-width: calc(100% - 32px); }
 .ithumb { width: 44px; height: 44px; object-fit: cover; object-position: center; border-radius: 8px; border: 1px solid var(--line); flex: 0 0 auto; display: block; background: var(--sunken); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 .ithumb.none { border-color: transparent; background: transparent; box-shadow: none; }
 .ithumb.tiny { width: 22px; height: 22px; border-radius: 5px; box-shadow: none; }
@@ -462,6 +464,21 @@ function shareFallback(text) {
     <textarea class="field" rows="6" style="width:100%" readonly>${esc(text)}</textarea></form>`;
   dlg.showModal(); const ta = dlg.querySelector('textarea'); ta.focus(); ta.select();
 }
+/* ---------- notice a newer version of the app (an open tab keeps running the old one until reloaded) ---------- */
+const BUILD = document.querySelector('meta[name="app-build"]')?.content || '';
+async function newerBuild() {
+  if (!BUILD) return false;
+  try { const t = await (await fetch(location.pathname, { cache: 'no-store' })).text(); const m = t.match(/name="app-build" content="(\d+)"/); return !!m && m[1] !== BUILD; } catch { return false; }
+}
+async function checkForUpdate() {
+  if (document.getElementById('updBar') || !(await newerBuild())) return;
+  const bar = document.createElement('div'); bar.id = 'updBar'; bar.className = 'upd-bar';
+  bar.innerHTML = 'A newer version of the app is available. <button class="btn sm primary" type="button">Reload now</button>';
+  bar.querySelector('button').onclick = () => location.reload();
+  document.body.appendChild(bar);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+setInterval(checkForUpdate, 5 * 60 * 1000);
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2600); }
 function isLate(it) { return it.status !== 'done' && it.plannedEnd && it.plannedEnd < todayISO(); }
 function statusPill(it) { const s = ST[it.status] || ST.planned; return `<span class="pill ${s.cls}">${s.label}</span>`; }
@@ -1174,7 +1191,9 @@ function confirmResetStatus() {
   word.oninput = () => { go.disabled = word.value.trim().toUpperCase() !== 'RESET'; };
   dlg.querySelectorAll('[data-close]').forEach(b => b.onclick = () => dlg.close());
   go.onclick = async () => {
-    go.disabled = true; word.disabled = true; msg.textContent = 'Saving a backup…';
+    go.disabled = true; word.disabled = true;
+    if (await newerBuild()) { msg.textContent = 'The app was just updated. Reloading so the reset uses the latest version… then please press Reset again.'; setTimeout(() => location.reload(), 2500); return; }
+    msg.textContent = 'Saving a backup…';
     try {
       const backup = await store.statusBackup();
       if (!backupHasData(backup)) { msg.textContent = 'Nothing to reset: every item is already Not Started, Normal priority, unassigned, with no dates, amounts, updates or photos.'; return; }
