@@ -180,14 +180,14 @@ button.kpi:hover { border-color: var(--muted); }
 .group-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--head-tint); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; }
 .group-head .bar { flex: 0 0 90px; }
 @media (max-width: 560px) { .group-head { flex-wrap: wrap; row-gap: 4px; } .group-head h2 { flex: 1 0 100%; } }
-.item-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 48px 150px 130px 90px; gap: 12px; align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.item-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 150px 150px 130px 90px; gap: 12px; align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--line); }
 .item-row:hover { background: var(--sunken); }
 .item-row .title { cursor: pointer; min-width: 0; }
 .item-row .title b { font-weight: 500; }
 .ithumb { width: 44px; height: 44px; object-fit: cover; object-position: center; border-radius: 8px; border: 1px solid var(--line); flex: 0 0 auto; display: block; background: var(--sunken); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 .ithumb.none { border-color: transparent; background: transparent; box-shadow: none; }
 .ithumb.tiny { width: 22px; height: 22px; border-radius: 5px; box-shadow: none; }
-.item-row .c-thumb { display: flex; justify-content: center; cursor: pointer; }
+.item-row .c-thumb { display: flex; justify-content: flex-start; cursor: pointer; }
 .card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
 .tl-name { display: flex; align-items: center; gap: 8px; }
 .tl-name .tl-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
