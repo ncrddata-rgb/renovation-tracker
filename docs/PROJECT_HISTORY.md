@@ -37,6 +37,7 @@ A dated log of what was built and decided, oldest first. Times are UTC (India is
   - Polish: on the Items page they sit in their own aligned column, spaced exactly like the contact and date columns. They're a uniform 44 px, cropped (not stretched), with rounded corners.
 - **Reset status data (Owner only, Team tab).** Built up over several requests. On every item it clears:
   - status (back to Not Started) and progress (back to 0%);
+  - priority (back to Normal; added 25 Nov at the owner's request);
   - planned start, due date and completion date;
   - estimate and amount spent;
   - who the item is assigned to.
@@ -46,7 +47,7 @@ A dated log of what was built and decided, oldest first. Times are UTC (India is
   - It uses field-level updates only, so aspects, item details, the team and settings are never touched.
   - Afterwards it checks against the server and asks the Owner to retry if anything was left.
   - If there's nothing to clear, it does nothing, so there's no empty backup.
-- **Reset backup format.** Changed from raw JSON to an organised Excel file (Summary, Items, Updates and history, Photos), plus a photos JSON when there are photos. The owner's first real backup was converted for them.
+- **Reset backup format.** Changed from raw JSON to an organised Excel file (Summary, Items including old priority, Updates and history, Photos), plus a photos JSON when there are photos. The owner's first real backup was converted for them.
 - **Caching fix.** The site root was cached for up to an hour after deploys, so people kept seeing old versions. `firebase.json` now sends `no-cache` for `/`.
 - **Removed** the Items page "Export to Excel (CSV)" button.
 - **Reports tab** shown to Owners only; others are redirected.

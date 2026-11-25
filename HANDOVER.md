@@ -146,6 +146,6 @@ python3 -m http.server 8000      # or any static server
 
 - Photos are stored inside Firestore documents as compressed data URLs. There's no Cloud Storage bucket. `shrink()` keeps each one well under Firestore's 1 MB document limit.
 - The item change log is written by the client (`logChanges`) whenever status, progress, dates, money or the contact changes. Reports are built from it.
-- **Reset status data** (Team tab, Owner only) clears these fields on every item, using a field-level `update()`: status, progress, dates, estimate, spent and contact. It also deletes everything in `comments`, `photos` and `thumbs`. Aspects, item details, members and settings are never touched. It downloads an Excel backup first.
+- **Reset status data** (Team tab, Owner only) clears these fields on every item, using a field-level `update()`: status, progress, priority (back to Normal), dates, estimate, spent and contact. It also deletes everything in `comments`, `photos` and `thumbs`. Aspects, item details, members and settings are never touched. It downloads an Excel backup first.
 - **Full backup** (Team tab, Owner only) downloads the whole project read-only as `full-backup-<date>.xlsx` (readable) and `.json` (complete, including photos). **Keep those files out of this public repo.**
 - The owner's EmailJS automatic invite emails are coded but switched off. They need `emailjs.serviceId`, `templateId` and `publicKey` in `config.js`. Until then, invites go out through the WhatsApp, Telegram, Email and Copy link menu.

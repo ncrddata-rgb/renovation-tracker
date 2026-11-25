@@ -57,4 +57,5 @@ A private progress tracker for a G+2 house renovation with a terrace in Hyderaba
 ## Open items when development was handed over (25 Nov 2026)
 
 - **Automatic invite emails (EmailJS):** the code is in place but switched off until `config.js` gets `emailjs: { serviceId, templateId, publicKey }`.
+- **Reset** clears status, progress, priority, dates, amounts and assignee on every item, plus all updates, history and photos. It never touches aspects, item titles and details, the team or settings.
 - **Reset and photos:** the owner once said uploaded images should stay unchanged on reset, while an earlier request asked for photos to be deleted. Reset currently deletes photos (after backing them up). Confirm with the owner before changing it.

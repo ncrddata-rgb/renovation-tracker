@@ -534,9 +534,9 @@ function DemoStore() {
     async deletePhoto(id) { db.photos = db.photos.filter(p => p.id !== id); lsSet(KEY, db); state.thumbs = demoThumbs(); thumbsChanged(); },
     async setThumb() {}, async clearThumb() {},
     async fullExport() { return { aspects: [...db.aspects], items: [...db.items], members: [...db.members], settings: { ...db.settings }, comments: [...db.comments], photos: [...db.photos] }; },
-    async statusBackup() { return { items: db.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact })), comments: [...db.comments], photos: [...db.photos] }; },
+    async statusBackup() { return { items: db.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact, priority: i.priority })), comments: [...db.comments], photos: [...db.photos] }; },
     async resetStatus() {
-      db.items.forEach(i => Object.assign(i, { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '' }));
+      db.items.forEach(i => Object.assign(i, { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '', priority: 'Normal' }));
       db.comments = []; db.photos = []; persist(); state.thumbs = {}; thumbsChanged();
       return db.items.filter(i => i.contact || i.status !== 'planned').length;
     },
@@ -648,13 +648,13 @@ async function FirebaseStore() {
     },
     async statusBackup() {
       const all = async name => (await fs.getDocs(col(name))).docs.map(d => { const x = d.data(); return { id: d.id, ...x, at: x.at?.toMillis ? x.at.toMillis() : x.at }; });
-      return { items: state.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact })), comments: await all('comments'), photos: await all('photos') };
+      return { items: state.items.map(i => ({ id: i.id, title: i.title, status: i.status, progress: i.progress, actualDate: i.actualDate, plannedStart: i.plannedStart, plannedEnd: i.plannedEnd, estimate: i.estimate, actualSpent: i.actualSpent, contact: i.contact, priority: i.priority })), comments: await all('comments'), photos: await all('photos') };
     },
     // Owner only: back to Not Started and 0% for every item; remove updates, change history and photos.
     // Aspects, item details, dates, money, team and settings are left as they are.
     async resetStatus(backup) {
       const ops = [];
-      state.items.forEach(i => ops.push(b => b.update(fs.doc(db, 'items', i.id), { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '', ...stamp() })));
+      state.items.forEach(i => ops.push(b => b.update(fs.doc(db, 'items', i.id), { status: 'planned', progress: 0, actualDate: '', plannedStart: '', plannedEnd: '', estimate: '', actualSpent: '', contact: '', priority: 'Normal', ...stamp() })));
       backup.comments.forEach(c => ops.push(b => b.delete(fs.doc(db, 'comments', c.id))));
       backup.photos.forEach(p => ops.push(b => b.delete(fs.doc(db, 'photos', p.id))));
       for (let k = 0; k < ops.length; k += 400) { const b = fs.writeBatch(db); ops.slice(k, k + 400).forEach(f => f(b)); await b.commit(); }
@@ -663,7 +663,7 @@ async function FirebaseStore() {
       state.thumbs = {}; thumbsChanged();
       // Check the saved data on the server, not this browser's copy
       const fresh = await (fs.getDocsFromServer || fs.getDocs)(col('items'));
-      return fresh.docs.filter(d => { const x = d.data(); return x.contact || (x.status || 'planned') !== 'planned' || Number(x.progress) || x.plannedStart || x.plannedEnd; }).length;
+      return fresh.docs.filter(d => { const x = d.data(); return x.contact || (x.priority || 'Normal') !== 'Normal' || (x.status || 'planned') !== 'planned' || Number(x.progress) || x.plannedStart || x.plannedEnd; }).length;
     },
     async seed(S) {
       const b = fs.writeBatch(db);
@@ -1023,7 +1023,7 @@ function viewTeam(main) {
       <p class="small muted" style="margin:4px 0 12px">Download a complete copy of the project as it is now: every aspect, item, team member, setting, update and photo. Changes nothing.</p>
       <button class="btn" type="button" id="fullBackup">Download full backup</button> <span class="small muted" id="fb_msg"></span></section>
     <section class="panel danger-zone" style="margin-top:16px;max-width:560px"><h2>Reset status data</h2>
-      <p class="small muted" style="margin:4px 0 12px">Start tracking afresh. Every item goes back to Not Started, 0%, unassigned, with no dates or amounts, and all progress updates, notes, change history and uploaded photos are removed for everyone. Aspects, items, categories, the team and these settings are kept. A backup file downloads first.</p>
+      <p class="small muted" style="margin:4px 0 12px">Start tracking afresh. Every item goes back to Not Started, 0%, Normal priority, unassigned, with no dates or amounts, and all progress updates, notes, change history and uploaded photos are removed for everyone. Aspects, items, categories, the team and these settings are kept. A backup file downloads first.</p>
       <button class="btn danger" type="button" id="resetStatus">Reset status data…</button></section>` : ''}
     <section class="panel" style="margin-top:32px;max-width:640px"><h2>What each role can do</h2>
       <div class="tbl-wrap"><table><tbody>
@@ -1057,7 +1057,7 @@ function viewTeam(main) {
 }
 
 /* ---------- reset backup: an organised Excel file (plus the photos themselves, if any) ---------- */
-const isDefaultItem = i => (i.status || 'planned') === 'planned' && !Number(i.progress) && !i.actualDate && !i.plannedStart && !i.plannedEnd && !i.estimate && !i.actualSpent && !i.contact;
+const isDefaultItem = i => (i.status || 'planned') === 'planned' && !Number(i.progress) && !i.actualDate && !i.plannedStart && !i.plannedEnd && !i.estimate && !i.actualSpent && !i.contact && (i.priority || 'Normal') === 'Normal';
 const backupHasData = b => b.items.some(i => !isDefaultItem(i)) || b.comments.length > 0 || b.photos.length > 0;
 async function downloadResetBackup(b) {
   await loadScript('vendor/xlsx.full.min.js');
@@ -1079,18 +1079,18 @@ async function downloadResetBackup(b) {
     ['Saved by', person(state.user.email)],
     [],
     ['Items in the project', b.items.length],
-    ['Items with status, dates, amounts or a person (cleared by the reset)', changed],
+    ['Items with status, priority, dates, amounts or a person (cleared by the reset)', changed],
     ['Progress updates and notes', b.comments.length],
     ['Photos', b.photos.length],
     [],
     ['What is in this file', ''],
-    ['Items', 'Every item as it was just before the reset: status, progress, dates, amounts and who it was assigned to.'],
+    ['Items', 'Every item as it was just before the reset: status, progress, priority, dates, amounts and who it was assigned to.'],
     ['Updates and history', 'Every note and status change, newest first.'],
     ['Photos', b.photos.length ? 'A list of the photos. The photos themselves are saved in a second file, photos-backup, downloaded at the same time.' : 'There were no photos.']
   ], [62, 90]);
-  sheet('Items', [['Aspect', 'Floor', 'Item', 'Status', 'Progress %', 'Planned start', 'Due date', 'Completed on', 'Estimate (₹)', 'Spent (₹)', 'Assigned to', 'Item ID'],
-    ...sorted.map(i => { const f = full(i.id); return [aspectOf(i.id), f.floor || '', i.title || f.title || '', (ST[i.status] || ST.planned).label, Number(i.progress) || 0, d(i.plannedStart), d(i.plannedEnd), d(i.actualDate), money(i.estimate), money(i.actualSpent), person(i.contact), i.id]; })],
-    [24, 14, 44, 13, 11, 14, 14, 14, 13, 13, 34, 10]);
+  sheet('Items', [['Aspect', 'Floor', 'Item', 'Status', 'Progress %', 'Priority', 'Planned start', 'Due date', 'Completed on', 'Estimate (₹)', 'Spent (₹)', 'Assigned to', 'Item ID'],
+    ...sorted.map(i => { const f = full(i.id); return [aspectOf(i.id), f.floor || '', i.title || f.title || '', (ST[i.status] || ST.planned).label, Number(i.progress) || 0, i.priority || 'Normal', d(i.plannedStart), d(i.plannedEnd), d(i.actualDate), money(i.estimate), money(i.actualSpent), person(i.contact), i.id]; })],
+    [24, 14, 44, 13, 11, 10, 14, 14, 14, 13, 13, 34, 10]);
   const chg = c => { const x = parseChange(c), out = [];
     if (x.status) out.push(`Status: ${(ST[x.status[0]] || {}).label || x.status[0] || '–'} → ${(ST[x.status[1]] || {}).label || x.status[1] || '–'}`);
     if (x.progress) out.push(`Progress: ${x.progress[0]}% → ${x.progress[1]}%`);
@@ -1155,6 +1155,7 @@ function confirmResetStatus() {
         <li>Status goes back to <b>Not Started</b> and progress to <b>0%</b>, and all start, due and completion dates are cleared</li>
         <li>All estimates and amounts spent are cleared</li>
         <li>Every item becomes unassigned (no point of contact)</li>
+        <li>Every item's priority goes back to Normal</li>
         <li>All progress updates, notes and change history are deleted</li>
         <li>All uploaded photos are deleted</li></ul>
       <p class="small muted">Kept as they are: aspects, items and their details, categories, the team and project settings (including the overall budget). A backup Excel file of everything that is cleared downloads to this device first.</p>
@@ -1169,7 +1170,7 @@ function confirmResetStatus() {
     go.disabled = true; word.disabled = true; msg.textContent = 'Saving a backup…';
     try {
       const backup = await store.statusBackup();
-      if (!backupHasData(backup)) { msg.textContent = 'Nothing to reset: every item is already Not Started, unassigned, with no dates, amounts, updates or photos.'; return; }
+      if (!backupHasData(backup)) { msg.textContent = 'Nothing to reset: every item is already Not Started, Normal priority, unassigned, with no dates, amounts, updates or photos.'; return; }
       await downloadResetBackup(backup);
       msg.textContent = 'Resetting…';
       const left = await store.resetStatus(backup);
