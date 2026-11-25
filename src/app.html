@@ -579,7 +579,22 @@ async function FirebaseStore() {
         state.thumbsOk = true; state.thumbs = Object.fromEntries(s.docs.map(d => [d.id, d.data().data]));
         state.thumbMeta = Object.fromEntries(s.docs.map(d => [d.id, d.data().photoId]));
         thumbsChanged();
-      }, e => { state.thumbsOk = false; console.warn('Thumbnails unavailable:', e.code || e); }));
+      }, e => { state.thumbsOk = false; console.warn('Thumbnail store unavailable, building thumbnails from photos:', e.code || e); watchPhotoThumbs(); }));
+      // Fallback: build each item's thumbnail in the browser from its newest photo
+      const made = {};
+      function watchPhotoThumbs() {
+        unsubs.push(fs.onSnapshot(col('photos'), async s => {
+          const newest = {};
+          s.docs.forEach(d => { const x = d.data(), at = x.at?.toMillis ? x.at.toMillis() : Date.now();
+            if (x.itemId && (!newest[x.itemId] || at > newest[x.itemId].at)) newest[x.itemId] = { id: d.id, at, data: x.data }; });
+          const out = {};
+          for (const [itemId, ph] of Object.entries(newest)) {
+            if (!made[ph.id]) made[ph.id] = await makeThumb(ph.data);
+            if (made[ph.id]) out[itemId] = made[ph.id];
+          }
+          state.thumbs = out; thumbsChanged();
+        }, e => console.warn('Photos unavailable for thumbnails:', e.code || e)));
+      }
     },
     async saveItem(id, data) {
       if (id) { await fs.updateDoc(fs.doc(db, 'items', id), { ...data, ...stamp() }); return id; }
