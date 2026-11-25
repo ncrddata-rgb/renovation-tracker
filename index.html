@@ -1048,6 +1048,62 @@ function viewTeam(main) {
   if (sf) sf.onsubmit = async e => { e.preventDefault(); try { await store.saveSettings({ projectName: $('#s_name').value.trim(), deadline: $('#s_deadline').value || '2026-12-25', budget: Number($('#s_budget').value) || 0 }); toast('Settings saved'); } catch { toast('Could not save settings'); } };
 }
 
+/* ---------- reset backup: an organised Excel file (plus the photos themselves, if any) ---------- */
+const isDefaultItem = i => (i.status || 'planned') === 'planned' && !Number(i.progress) && !i.actualDate && !i.plannedStart && !i.plannedEnd && !i.estimate && !i.actualSpent && !i.contact;
+const backupHasData = b => b.items.some(i => !isDefaultItem(i)) || b.comments.length > 0 || b.photos.length > 0;
+async function downloadResetBackup(b) {
+  await loadScript('vendor/xlsx.full.min.js');
+  const X = window.XLSX, wb = X.utils.book_new();
+  const now = new Date(), stampTxt = now.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const full = id => state.items.find(i => i.id === id) || {};
+  const itemName = id => (full(id).title || (b.items.find(i => i.id === id) || {}).title || '(deleted item)');
+  const aspectOf = id => aspectName(full(id).aspectId) || '';
+  const person = e => e ? `${memberName(e)}${memberName(e) !== e ? ' (' + e + ')' : ''}` : '';
+  const when = ms => ms ? new Date(ms).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const d = iso => iso ? fmtDateY(iso) : '';
+  const money = v => (v === '' || v == null) ? '' : Number(v);
+  const changed = b.items.filter(i => !isDefaultItem(i)).length;
+  const sheet = (name, rows, widths) => { const ws = X.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map(w => ({ wch: w })); if (rows.length > 1) ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: rows[0].length - 1 } }) }; X.utils.book_append_sheet(wb, ws, name); };
+  const sorted = [...b.items].sort((x, y) => (sortedAspects().findIndex(a => a.id === full(x.id).aspectId) - sortedAspects().findIndex(a => a.id === full(y.id).aspectId)) || (full(x.id).order || 0) - (full(y.id).order || 0));
+  sheet('Summary', [
+    ['Backup before reset', projectName()],
+    ['Saved on', stampTxt],
+    ['Saved by', person(state.user.email)],
+    [],
+    ['Items in the project', b.items.length],
+    ['Items with status, dates, amounts or a person (cleared by the reset)', changed],
+    ['Progress updates and notes', b.comments.length],
+    ['Photos', b.photos.length],
+    [],
+    ['What is in this file', ''],
+    ['Items', 'Every item as it was just before the reset: status, progress, dates, amounts and who it was assigned to.'],
+    ['Updates and history', 'Every note and status change, newest first.'],
+    ['Photos', b.photos.length ? 'A list of the photos. The photos themselves are saved in a second file, photos-backup, downloaded at the same time.' : 'There were no photos.']
+  ], [62, 90]);
+  sheet('Items', [['Aspect', 'Floor', 'Item', 'Status', 'Progress %', 'Planned start', 'Due date', 'Completed on', 'Estimate (₹)', 'Spent (₹)', 'Assigned to', 'Item ID'],
+    ...sorted.map(i => { const f = full(i.id); return [aspectOf(i.id), f.floor || '', i.title || f.title || '', (ST[i.status] || ST.planned).label, Number(i.progress) || 0, d(i.plannedStart), d(i.plannedEnd), d(i.actualDate), money(i.estimate), money(i.actualSpent), person(i.contact), i.id]; })],
+    [24, 14, 44, 13, 11, 14, 14, 14, 13, 13, 34, 10]);
+  const chg = c => { const x = parseChange(c), out = [];
+    if (x.status) out.push(`Status: ${(ST[x.status[0]] || {}).label || x.status[0] || '–'} → ${(ST[x.status[1]] || {}).label || x.status[1] || '–'}`);
+    if (x.progress) out.push(`Progress: ${x.progress[0]}% → ${x.progress[1]}%`);
+    if (x.contact) out.push(`Assigned: ${memberName(x.contact[0]) || 'nobody'} → ${memberName(x.contact[1]) || 'nobody'}`);
+    return out.join(' · '); };
+  // Older entries were written with the old status names
+  const relabel = t => String(t || '').replace(/\bPlanned\b(?! (start|end))/g, 'Not Started').replace(/\bDone\b/g, 'Completed');
+  const details = c => c.kind === 'change' ? (c.text ? relabel(c.text) : chg(c)) : (c.text || '');
+  sheet('Updates and history', [['When', 'Aspect', 'Item', 'Type', 'By', 'Details'],
+    ...[...b.comments].sort((x, y) => (y.at || 0) - (x.at || 0)).map(c => [when(c.at), aspectOf(c.itemId), itemName(c.itemId), c.kind === 'change' ? 'Change' : 'Note', person(c.by), details(c)])],
+    [20, 22, 40, 14, 32, 70]);
+  sheet('Photos', [['When', 'Aspect', 'Item', 'Before / after', 'Uploaded by', 'Photo ID'],
+    ...[...b.photos].sort((x, y) => (y.at || 0) - (x.at || 0)).map(ph => [when(ph.at), aspectOf(ph.itemId), itemName(ph.itemId), ph.kind ? ph.kind[0].toUpperCase() + ph.kind.slice(1) : '', person(ph.by), ph.id])],
+    [20, 22, 40, 14, 32, 24]);
+  const tag = `${todayISO()}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+  saveBlob(`reset-backup-${tag}.xlsx`, new Blob([X.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  if (b.photos.length) {
+    const photos = b.photos.map(ph => ({ id: ph.id, item: itemName(ph.itemId), itemId: ph.itemId, kind: ph.kind || '', by: ph.by || '', at: ph.at ? new Date(ph.at).toISOString() : '', image: ph.data }));
+    saveBlob(`photos-backup-${tag}.json`, new Blob([JSON.stringify({ project: projectName(), savedAt: now.toISOString(), photos }, null, 2)], { type: 'application/json' }));
+  }
+}
 function confirmResetStatus() {
   if (!can.members()) return;
   const dlg = $('#dlg');
@@ -1061,7 +1117,7 @@ function confirmResetStatus() {
         <li>Every item becomes unassigned (no point of contact)</li>
         <li>All progress updates, notes and change history are deleted</li>
         <li>All uploaded photos are deleted</li></ul>
-      <p class="small muted">Kept as they are: aspects, items and their details, categories, the team and project settings (including the overall budget). A backup file of what is removed downloads to this device first.</p>
+      <p class="small muted">Kept as they are: aspects, items and their details, categories, the team and project settings (including the overall budget). A backup Excel file of everything that is cleared downloads to this device first.</p>
       <label class="small" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:14px"><span>Type <b>RESET</b> to confirm</span><input class="field" id="rs_word" autocomplete="off" style="max-width:240px"></label>
       <div class="row-actions"><button class="btn danger" type="button" id="rs_go" disabled>Reset status data</button><button class="btn" type="button" data-close>Cancel</button><span class="small muted" id="rs_msg"></span></div></div>`;
   dlg.showModal();
@@ -1073,7 +1129,8 @@ function confirmResetStatus() {
     go.disabled = true; word.disabled = true; msg.textContent = 'Saving a backup…';
     try {
       const backup = await store.statusBackup();
-      saveBlob(`status-backup-${todayISO()}.json`, new Blob([JSON.stringify({ project: projectName(), savedAt: new Date().toISOString(), by: state.user.email, ...backup })], { type: 'application/json' }));
+      if (!backupHasData(backup)) { msg.textContent = 'Nothing to reset: every item is already Not Started, unassigned, with no dates, amounts, updates or photos.'; return; }
+      await downloadResetBackup(backup);
       msg.textContent = 'Resetting…';
       const left = await store.resetStatus(backup);
       if (left) { msg.textContent = `${left} item${left === 1 ? ' was' : 's were'} not fully reset. Please refresh the page and press Reset again.`; go.disabled = false; word.disabled = false; return; }
