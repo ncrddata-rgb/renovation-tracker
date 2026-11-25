@@ -679,7 +679,8 @@ const VIEWS = [
 ];
 const visibleViews = () => VIEWS.filter(v => v.id !== 'team' || can.members());
 const currentView = () => { const h = location.hash.slice(1); return visibleViews().some(v => v.id === h) ? h : 'dashboard'; };
-window.addEventListener('hashchange', () => { if (state.ready) render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { openSecs.clear(); if (state.ready) render(); window.scrollTo(0, 0); });
+try { localStorage.removeItem('reno-hidden-secs'); } catch {}
 
 function render() {
   const v = currentView();
@@ -1157,14 +1158,17 @@ async function loadPhotos(itemId) {
   });
 }
 /* ---------- dashboard hide/show ---------- */
-const hiddenSecs = () => lsGet('reno-hidden-secs') || {};
-const secHidden = id => hiddenSecs()[id] ? 'hidden' : '';
-const hideBtn = id => `<button type="button" class="btn sm ghost hide-btn" data-hide="${id}" aria-expanded="${!hiddenSecs()[id]}">${hiddenSecs()[id] ? 'Show' : 'Hide'}</button>`;
+// Every collapsible section starts hidden when a page is opened or refreshed.
+// Sections opened with Show stay open only while you stay on that page (so live updates do not snap them shut).
+const openSecs = new Set();
+const isHidden = id => !openSecs.has(id);
+const secHidden = id => isHidden(id) ? 'hidden' : '';
+const hideBtn = id => `<button type="button" class="btn sm ghost hide-btn" data-hide="${id}" aria-expanded="${!isHidden(id)}">${isHidden(id) ? 'Show' : 'Hide'}</button>`;
 function wireHide(root) {
   root.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
-    const h = hiddenSecs(), id = b.dataset.hide; h[id] = !h[id]; lsSet('reno-hidden-secs', h);
-    const body = b.closest('.dsec-head').nextElementSibling; body.hidden = !!h[id];
-    b.textContent = h[id] ? 'Show' : 'Hide'; b.setAttribute('aria-expanded', String(!h[id]));
+    const id = b.dataset.hide; if (openSecs.has(id)) openSecs.delete(id); else openSecs.add(id);
+    const hid = isHidden(id), body = b.closest('.dsec-head').nextElementSibling; body.hidden = hid;
+    b.textContent = hid ? 'Show' : 'Hide'; b.setAttribute('aria-expanded', String(!hid));
   });
 }
 const secHead = (id, title, style = '') => `<div class="dsec-head" style="${style}">${title.replace('<h2>', '<h2 style="margin:0">')}${hideBtn(id)}</div>`;
