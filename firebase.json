@@ -1,76 +1,35 @@
 {
-  "hosting": [
-    {
-      "target": "main",
-      "public": ".",
-      "ignore": [
-        "firebase.json",
-        ".firebaserc",
-        "**/.*",
-        "src/**",
-        "build.sh",
-        "README.md",
-        "firestore.rules",
-        "CLAUDE.md",
-        "HANDOVER.md",
-        "docs/**"
-      ],
-      "headers": [
-        {
-          "source": "/",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache"
-            }
-          ]
-        },
-        {
-          "source": "**/*.@(html|js)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "target": "mohalla",
-      "public": ".",
-      "ignore": [
-        "firebase.json",
-        ".firebaserc",
-        "**/.*",
-        "src/**",
-        "build.sh",
-        "README.md",
-        "firestore.rules",
-        "CLAUDE.md",
-        "HANDOVER.md",
-        "docs/**"
-      ],
-      "headers": [
-        {
-          "source": "/",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache"
-            }
-          ]
-        },
-        {
-          "source": "**/*.@(html|js)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+  "hosting": {
+    "site": "our-house-renovation",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "src/**",
+      "build.sh",
+      "README.md",
+      "firestore.rules"
+    ],
+    "headers": [
+      {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(html|js)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  }
 }

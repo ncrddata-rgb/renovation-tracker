@@ -1,17 +1,1 @@
-{
-  "projects": {
-    "default": "our-house-renovation-app"
-  },
-  "targets": {
-    "our-house-renovation-app": {
-      "hosting": {
-        "main": [
-          "our-house-renovation"
-        ],
-        "mohalla": [
-          "mohalla-development"
-        ]
-      }
-    }
-  }
-}
+{ "projects": { "default": "our-house-renovation-app" } }

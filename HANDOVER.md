@@ -1,6 +1,6 @@
 # Developer handover: House Renovation App
 
-The live app is at **https://mohalla-development.web.app**. The older address, https://our-house-renovation.web.app, serves the same app. It's a single-page web app with no framework and no build tools. It uses Firebase for Google sign-in and the database.
+The live app is at **https://our-house-renovation.web.app**. It's a single-page web app with no framework and no build tools. It uses Firebase for Google sign-in and the database.
 
 > No passwords, private keys or service-account files belong in this repo. The values in `config.js` are Firebase's public web settings and are safe to commit. The Firestore rules are what protect the data.
 
@@ -47,7 +47,7 @@ All the code is one `<script>`, wrapped in an IIFE. Rough order, top to bottom:
 ## 2. Firebase
 
 - **Project:** `our-house-renovation-app`
-- **Hosting sites:** `mohalla-development` (main link, https://mohalla-development.web.app) and `our-house-renovation` (the original address). Both are deploy targets in `firebase.json` and `.firebaserc` (`mohalla` and `main`), and the workflow publishes to both. A failure on the mohalla step doesn't block the other site.
+- **Hosting site:** `our-house-renovation`, served at https://our-house-renovation.web.app
 - **Sign-in:** Google only. Anyone can sign in, but they see nothing unless their email is on the Team list.
 
 ### Firestore collections
