@@ -54,6 +54,10 @@ A dated log of what was built and decided, oldest first. Times are UTC (India is
 - **Adding aspects and items is now Owner-only**, in both the UI and the rules. The owner published the updated rules.
 - **Developer handover.** Added `HANDOVER.md`, `CLAUDE.md`, this history, and an Owner-only **Full backup** button on the Team tab. It downloads the whole project (aspects, items, team, settings, history, photos) as Excel and JSON and changes nothing.
 
+## 28 Nov 2026: new main address
+
+- **New address:** https://mohalla-development.web.app, a second Firebase Hosting site in the same project. Every push publishes to both sites, and the old address keeps working. Share, Copy link and invites now use the new address.
+
 ## Known caveats
 
 - Photos live inside Firestore documents (each under 900 KB after downscaling), not in Cloud Storage.

@@ -11,7 +11,7 @@ window.RENO_CONFIG = {
     messagingSenderId: "967546857112",
     appId: "1:967546857112:web:826add42b4ac92d5ee52ed"
   },
-  appUrl: "https://our-house-renovation.web.app/",
+  appUrl: "https://mohalla-development.web.app/",
   projectName: "Our House Renovation",
   deadline: "2026-12-25"
 };

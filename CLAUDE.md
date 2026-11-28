@@ -6,7 +6,7 @@ Context and rules for Claude Code when working in this repository. **Read `HANDO
 
 A private progress tracker for a G+2 house renovation with a terrace in Hyderabad, with hand-over on 25 Dec 2026.
 
-- **Live app:** https://our-house-renovation.web.app (Firebase Hosting).
+- **Live app:** https://mohalla-development.web.app (main link since 28 Nov 2026). The same app is also published at https://our-house-renovation.web.app, and both Firebase Hosting sites update on every push.
 - **Backup mirror:** GitHub Pages.
 - **Data:** Firebase project `our-house-renovation-app`, with Google sign-in and Firestore.
 - **Seed:** 21 aspects and 85 items from the owner's Excel plan (`seed.js`).
@@ -51,7 +51,7 @@ A private progress tracker for a G+2 house renovation with a terrace in Hyderaba
   Managers and Engineers can edit existing aspects and items. Contractors update status and progress. Family can view, and add notes and photos.
 - **Status labels:** Not Started, In progress, On hold, Completed.
 - **Tab order:** Dashboard, Aspects, Items, Board, Photos, Timeline, Reports, Team.
-- **Share and invite links** always use `https://our-house-renovation.web.app`. Keep the invite text exactly as it is in `inviteText()`.
+- **Share and invite links** always use `https://mohalla-development.web.app`. Keep the invite text exactly as it is in `inviteText()`.
 - The owner isn't a developer. Explain things in plain words, with click-by-click steps, and confirm before anything that changes live data or settings.
 
 ## Open items when development was handed over (25 Nov 2026)

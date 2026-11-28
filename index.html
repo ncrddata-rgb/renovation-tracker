@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-build" content="20261125162535">
+<meta name="app-build" content="20261128091006">
 </head>
 <body>
 <title>House Renovation App</title>
@@ -354,9 +354,9 @@ const initials = s => (s || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).ma
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
-const APP_URL = 'https://our-house-renovation.web.app';
+const APP_URL = 'https://mohalla-development.web.app';
 // The address people are sent, whichever address the app was opened from
-const SHARE_LINK = 'https://our-house-renovation.web.app';
+const SHARE_LINK = 'https://mohalla-development.web.app';
 function inviteText(email) {
   return `${APP_URL}\n\nHi! 😊\nYou're just a few simple steps away from accessing our House Renovation App. Let's get started!\n\n1. Open the link shared above.\n2. Click on Sign in with Google.\n3. Select the Gmail account I've added for you.\n\nThat's it! You're all set! 🎉`;
 }
