@@ -15,10 +15,23 @@ jobs:
         env:
           KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: if [ -n "$KEY" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "FIREBASE_SERVICE_ACCOUNT secret is not set yet; skipping."; fi
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Publish to our-house-renovation.web.app
+        uses: FirebaseExtended/action-hosting-deploy@v0
         if: steps.key.outputs.ok == 'true'
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: our-house-renovation-app
           channelId: live
+          target: main
+      # Second address for the same app. Allowed to fail so it can never block the main site.
+      - name: Publish to mohalla-development.web.app
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        if: steps.key.outputs.ok == 'true'
+        continue-on-error: true
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: our-house-renovation-app
+          channelId: live
+          target: mohalla
